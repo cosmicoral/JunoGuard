@@ -91,7 +91,7 @@ When limits are exceeded TokenGuard automatically blocks requests.
 
 ⸻
 
-🤖 AI Security Detection
+🤖  Deterministic Security Detection
 
 Detects
 
@@ -100,6 +100,15 @@ Detects
 * Suspicious request frequency
 * Potential compromised credentials
 
+## Low-overhead by design
+
+TokenGuard does not require an additional LLM call to analyse each request.
+
+Usage monitoring, cost calculation, rate limiting, budget enforcement and
+credential-pattern detection are performed locally using deterministic rules.
+
+This means TokenGuard adds no additional AI-token consumption to the normal
+request path.
 ⸻
 
 📋 Incident Log
