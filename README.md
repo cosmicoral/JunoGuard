@@ -4,6 +4,21 @@
 
 **Built for the Cursor Cybersecurity London Hackathon — 1 August 2026, London.**
 
+[![npm](https://img.shields.io/npm/v/@heysalad/junoguard?color=e3b341&label=%40heysalad%2Fjunoguard)](https://www.npmjs.com/package/@heysalad/junoguard)
+[![node](https://img.shields.io/node/v/@heysalad/junoguard?color=3fb950)](https://www.npmjs.com/package/@heysalad/junoguard)
+[![license](https://img.shields.io/npm/l/@heysalad/junoguard?color=8a929c)](packages/junoguard/LICENSE)
+
+```bash
+# See a real block, with no gateway and no key
+JUNO_MOCK=1 npx @heysalad/junoguard scan @ossprey/test-package
+
+# Wire it into every AI coding agent on your machine
+npx @heysalad/junoguard init
+```
+
+`init` detects Cursor, Claude Code, Codex, VS Code and Windsurf, and writes the
+MCP config each one expects. Full docs: **[packages/junoguard](packages/junoguard)**.
+
 ---
 
 ## Meet Juno
@@ -174,6 +189,36 @@ What the agent sees:
 | `guard_status()` | Spend today, budget remaining, project status |
 
 `guard_status` matters: the agent can check its own budget before acting, rather than discovering the limit by hitting it.
+
+Shipped as [`@heysalad/junoguard`](https://www.npmjs.com/package/@heysalad/junoguard) —
+one npm package containing both the MCP server and the `juno` CLI:
+
+```json
+{
+  "mcpServers": {
+    "junoguard": {
+      "command": "npx",
+      "args": ["-y", "@heysalad/junoguard", "mcp"]
+    }
+  }
+}
+```
+
+The package is a client. It renders decisions; the gateway makes them. Live use
+needs a running gateway and a project key — there is no default key, and an
+unconfigured guard refuses rather than waving actions through.
+
+---
+
+## Repository layout
+
+| Path | What it is |
+|---|---|
+| `packages/junoguard/` | The published npm package — MCP server + `juno` CLI (TypeScript) |
+| `backend/` | The gateway: policy engine, budgets, kill switch (FastAPI) |
+| `frontend/` | Landing page and live dashboard (React, Vite) |
+| `mcp/`, `cli/` | The original Python implementations, kept working |
+| `docs/api-contract.md` | The frozen client/gateway contract |
 
 ---
 

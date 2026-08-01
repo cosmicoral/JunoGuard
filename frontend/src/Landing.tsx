@@ -1,4 +1,48 @@
+import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+
+const PACKAGE = "@heysalad/junoguard";
+const NPM_URL = "https://www.npmjs.com/package/@heysalad/junoguard";
+
+const installSteps = [
+  {
+    label: "01 / TRY IT",
+    note: "No gateway, no key. Offline fixtures.",
+    command: `JUNO_MOCK=1 npx ${PACKAGE} scan @ossprey/test-package`,
+  },
+  {
+    label: "02 / CONNECT YOUR AGENT",
+    note: "Detects Cursor, Claude Code, Codex, VS Code, Windsurf — writes each config.",
+    command: `npx ${PACKAGE} init`,
+  },
+];
+
+function CopyCommand({ command }: { command: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard is blocked outside a secure context; the text stays selectable.
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div className="install-command">
+      <code>
+        <span aria-hidden="true">$</span>
+        {command}
+      </code>
+      <button type="button" onClick={copy} aria-label={`Copy: ${command}`}>
+        {copied ? "COPIED" : "COPY"}
+      </button>
+    </div>
+  );
+}
 
 const decisions = [
   { time: "10:41:08", lane: "PKG", target: "@scope/telemetry-kit", verdict: "BLOCK", tone: "block" },
@@ -70,6 +114,7 @@ export function Landing() {
           <a href="#product">Product</a>
           <a href="#how">How it works</a>
           <a href="#architecture">Architecture</a>
+          <a href="#install">Install</a>
           <a href="https://github.com/cosmicoral/TokenGuard" target="_blank" rel="noreferrer">GitHub</a>
         </nav>
         <a className="nav-console" href="/dashboard">Live console <span>↗</span></a>
@@ -190,8 +235,37 @@ export function Landing() {
         </div>
       </section>
 
+      <section className="install-section" id="install">
+        <div className="install-head">
+          <p className="section-index">INSTALL / 04</p>
+          <h2>One command.<br />Every agent you use.</h2>
+          <p className="install-lede">
+            JunoGuard ships as an MCP server and a CLI in one package. Point your
+            agent at it once and every install it attempts is checked first.
+          </p>
+          <a className="text-action" href={NPM_URL} target="_blank" rel="noreferrer">
+            {PACKAGE} on npm ↗
+          </a>
+        </div>
+
+        <div className="install-steps">
+          {installSteps.map((step) => (
+            <motion.div className="install-step" key={step.label} {...reveal}>
+              <p className="card-label">{step.label}</p>
+              <CopyCommand command={step.command} />
+              <p className="install-note">{step.note}</p>
+            </motion.div>
+          ))}
+          <p className="install-foot">
+            Requires Node 18+. Live use needs a JunoGuard gateway and a project
+            key — there is no default key, and an unconfigured guard refuses
+            rather than waves through.
+          </p>
+        </div>
+      </section>
+
       <section className="final-cta">
-        <p className="section-index">READY / 04</p>
+        <p className="section-index">READY / 05</p>
         <h2>Give your agent<br />a line it cannot cross.</h2>
         <div>
           <a className="primary-action" href="/dashboard">Launch the live console <span>→</span></a>
