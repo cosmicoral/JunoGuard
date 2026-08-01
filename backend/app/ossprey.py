@@ -6,7 +6,11 @@ is configured, so the block path is demonstrable without the network.
 
 from __future__ import annotations
 
+import threading
+import time
+from collections import OrderedDict
 from typing import Any, Literal
+from urllib.parse import quote
 
 import httpx
 
@@ -30,9 +34,90 @@ UNAVAILABLE = "unavailable"
 # Ossprey ships this deliberately-flagged package for integration testing.
 CANARY = "@ossprey/test-package"
 
-# Small cache — the same package gets scanned repeatedly during a session and
-# a scan is the slowest thing on the hot path.
-_cache: dict[str, dict[str, Any]] = {}
+# --- caching ----------------------------------------------------------------
+#
+# The same package gets scanned repeatedly in a session and a scan is the
+# slowest thing on the hot path, so a cache is worth having. The previous one
+# was keyed on the string "latest" with no expiry, which meant a package cleared
+# this morning kept its allow after a malicious version was published this
+# afternoon — for as long as the process lived.
+#
+# Three rules follow from that:
+#   * cache only an immutable coordinate — a resolved version, never "latest"
+#   * expire entries, and bound how many there are
+#   * never cache a verdict that does not exist (a scanner outage)
+
+CACHE_TTL_SECONDS = 300
+RESOLVE_TTL_SECONDS = 60
+MAX_CACHE_ENTRIES = 512
+
+# Part of every cache key. Bump it when normalisation or thresholds change, so
+# verdicts decided under the old rules are not reused under the new ones.
+SCANNER_POLICY_VERSION = "1"
+
+_lock = threading.Lock()
+_verdicts: OrderedDict[str, tuple[float, dict[str, Any]]] = OrderedDict()
+_resolved: OrderedDict[str, tuple[float, str]] = OrderedDict()
+
+
+def _get(store: OrderedDict[str, tuple[float, Any]], key: str) -> Any | None:
+    with _lock:
+        entry = store.get(key)
+        if entry is None:
+            return None
+        expires_at, value = entry
+        if expires_at <= time.time():
+            del store[key]
+            return None
+        store.move_to_end(key)
+        return value
+
+
+def _put(store: OrderedDict[str, tuple[float, Any]], key: str, value: Any, ttl: int) -> None:
+    with _lock:
+        store[key] = (time.time() + ttl, value)
+        store.move_to_end(key)
+        while len(store) > MAX_CACHE_ENTRIES:
+            store.popitem(last=False)
+
+
+def clear_cache() -> None:
+    """Drop every cached verdict and resolution. For tests and operators."""
+    with _lock:
+        _verdicts.clear()
+        _resolved.clear()
+
+
+def _cache_key(ecosystem: str, package: str, version: str) -> str:
+    return f"v{SCANNER_POLICY_VERSION}|{ecosystem}|{package.strip().lower()}@{version}"
+
+
+def resolve_version(package: str, ecosystem: str) -> str | None:
+    """Ask the registry which version `latest` currently means.
+
+    Without this there is no immutable coordinate to cache against, and a cached
+    allow for "latest" silently covers versions nobody has looked at. Returning
+    None is a valid answer: the scan still happens, it just is not cached.
+    """
+    key = f"{ecosystem}|{package.strip().lower()}"
+    hit = _get(_resolved, key)
+    if hit:
+        return str(hit)
+
+    try:
+        if ecosystem == "npm":
+            url = f"{config.NPM_REGISTRY_URL}/{quote(package, safe='@')}/latest"
+            version = str(httpx.get(url, timeout=5.0).raise_for_status().json()["version"])
+        else:
+            url = f"{config.PYPI_URL}/pypi/{quote(package)}/json"
+            body = httpx.get(url, timeout=5.0).raise_for_status().json()
+            version = str(body["info"]["version"])
+    except Exception as exc:  # noqa: BLE001 - resolution is best-effort
+        print(f"[juno] could not resolve a version for {package}: {exc}")
+        return None
+
+    _put(_resolved, key, version, RESOLVE_TTL_SECONDS)
+    return version
 
 
 def _mock_verdict(package: str) -> dict[str, Any]:
@@ -85,20 +170,26 @@ def _parse(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def scan(package: str, ecosystem: str = "npm", version: str | None = None) -> dict[str, Any]:
-    key = f"{ecosystem}:{package}@{version or 'latest'}"
-    if key in _cache:
-        return {**_cache[key], "source": "cache"}
-
+    """Get a verdict for one package, caching only what is safe to cache."""
     if not config.USE_OSSPREY:
-        verdict = _mock_verdict(package)
-        _cache[key] = verdict
-        return verdict
+        # Deterministic and local: nothing to gain from caching it, and a mock in
+        # the cache is a mock that outlives the reason it was there.
+        return _mock_verdict(package)
+
+    # An immutable coordinate, or no caching at all.
+    resolved = version or resolve_version(package, ecosystem)
+    key = _cache_key(ecosystem, package, resolved) if resolved else None
+
+    if key:
+        cached = _get(_verdicts, key)
+        if cached:
+            return {**cached, "source": "cache", "version": resolved}
 
     try:
         r = httpx.post(
             f"{config.OSSPREY_BASE_URL}/v1/scan",
             headers={"Authorization": f"Bearer {config.OSSPREY_API_KEY}"},
-            json={"package": package, "ecosystem": ecosystem, "version": version},
+            json={"package": package, "ecosystem": ecosystem, "version": resolved},
             timeout=10.0,
         )
         r.raise_for_status()
@@ -117,8 +208,9 @@ def scan(package: str, ecosystem: str = "npm", version: str | None = None) -> di
             "error": str(exc),
         }
 
-    _cache[key] = verdict
-    return verdict
+    if key:
+        _put(_verdicts, key, verdict, CACHE_TTL_SECONDS)
+    return {**verdict, "version": resolved}
 
 
 def at_least(severity: str, threshold: str) -> bool:

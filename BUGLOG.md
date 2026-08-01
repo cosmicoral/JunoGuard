@@ -34,7 +34,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-007 | P1 | FIXED | OAuth regression makes the default mock/offline dashboard unreachable |
 | JG-008 | P1 | FIXED | A configured live dashboard silently degrades to mock data |
 | JG-009 | P1 | FIXED | CLI and MCP enforcement can be bypassed by supported install paths |
-| JG-010 | P1 | OPEN | Package verdict cache can preserve a stale `latest` allow indefinitely |
+| JG-010 | P1 | FIXED | Package verdict cache can preserve a stale `latest` allow indefinitely |
 | JG-011 | P1 | FIXED | Realtime subscriptions are not project-scoped and can mix tenant data |
 | JG-012 | P1 | OPEN | Product claims include Modal, SBOM, and unbypassable enforcement that are not implemented |
 | JG-013 | P1 | OPEN | No project-owned automated tests protect security invariants |
@@ -314,7 +314,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-010 — `latest` package verdicts can remain stale indefinitely
 
 **Priority:** P1 / High  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** The process-global Ossprey cache has no TTL. The cache key
 > uses `latest` when no version is supplied. A package allowed today can keep

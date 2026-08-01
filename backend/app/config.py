@@ -42,6 +42,13 @@ OSSPREY_API_KEY = os.getenv("OSSPREY_API_KEY", "")
 OSSPREY_BASE_URL = os.getenv("OSSPREY_BASE_URL", "https://api.ossprey.com").rstrip("/")
 USE_OSSPREY = bool(OSSPREY_API_KEY)
 
+# --- package registries -----------------------------------------------------
+# Used only to resolve what `latest` currently means, so a verdict is cached
+# against an immutable version rather than a moving tag.
+
+NPM_REGISTRY_URL = os.getenv("NPM_REGISTRY_URL", "https://registry.npmjs.org").rstrip("/")
+PYPI_URL = os.getenv("PYPI_URL", "https://pypi.org").rstrip("/")
+
 # --- Model provider ---------------------------------------------------------
 
 MOCK_PROVIDER = _bool("MOCK_PROVIDER", True)
