@@ -599,7 +599,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 
 ### Failed or warned
 
-- `pytest`: no project tests collected.
+- `pytest`: security-invariant suite collected and passing (JG-013).
 - Browser `/dashboard` without Supabase: redirected to disabled OAuth sign-in;
   default mock dashboard unavailable (JG-007).
 - Unauthenticated recent events: HTTP 200 (JG-005).
