@@ -1,4 +1,12 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  resolveDataSource,
+  resolveJunoMode,
+  type DataSource,
+  type JunoMode,
+} from "./mode";
+
+export type { DataSource, JunoMode };
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -10,12 +18,12 @@ export const apiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.repl
  * Data source precedence, matching docs/api-contract.md:
  *   Supabase (if VITE_SUPABASE_URL) > SSE (if VITE_API_URL) > mock
  */
-export type DataSource = "supabase" | "sse" | "mock";
-
-export const dataSource: DataSource =
-  url && anonKey ? "supabase" : apiUrl ? "sse" : "mock";
-
 export const isSupabaseConfigured = Boolean(url && anonKey);
+
+export const dataSource: DataSource = resolveDataSource(
+  isSupabaseConfigured,
+  Boolean(apiUrl),
+);
 
 /**
  * Whether this build is a demo or a control plane.
@@ -30,28 +38,19 @@ export const isSupabaseConfigured = Boolean(url && anonKey);
  * falling back to something more permissive. Only an undeclared local build
  * falls back to demo.
  */
-export type JunoMode = "demo" | "live";
+const resolved = resolveJunoMode(
+  import.meta.env.VITE_JUNO_MODE as string | undefined,
+  isSupabaseConfigured,
+);
 
-const declaredMode = (import.meta.env.VITE_JUNO_MODE as string | undefined)
-  ?.trim()
-  .toLowerCase();
-
-export const modeIsDeclared = declaredMode === "live" || declaredMode === "demo";
-
-export const mode: JunoMode =
-  declaredMode === "live"
-    ? "live"
-    : declaredMode === "demo"
-      ? "demo"
-      : isSupabaseConfigured
-        ? "live"
-        : "demo";
+export const modeIsDeclared = resolved.modeIsDeclared;
+export const mode: JunoMode = resolved.mode;
 
 /**
  * Live mode declared, but the credentials it needs are absent. Never resolved
  * by relaxing the gate: removing a variable must not be a way past sign-in.
  */
-export const isMisconfigured = mode === "live" && !isSupabaseConfigured;
+export const isMisconfigured = resolved.isMisconfigured;
 
 /** True when the feed is driven by a live source rather than the mock timer. */
 export const isLive = dataSource !== "mock";

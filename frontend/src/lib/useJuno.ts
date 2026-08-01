@@ -17,6 +17,7 @@ import {
   seedIncidents,
   suspendedAction,
 } from "./mock";
+import { sumBillableCost } from "./spend";
 
 const MAX_ROWS = 140;
 
@@ -47,18 +48,6 @@ export interface ControlEvent {
 
 /** Pause before re-issuing a stream token, so a 401 cannot become a hot loop. */
 const TOKEN_RETRY_MS = 2_000;
-
-/**
- * Billable spend is any action that cost money, whatever it was labelled.
- * `flag` is proceedable — the provider was called and the charge is real — so
- * filtering to `allow` here understated spend exactly when it mattered most,
- * above the 80% threshold where decisions start coming back flagged.
- */
-function sumBillableCost(rows: AgentAction[]): number {
-  let total = 0;
-  for (const a of rows) if (a.cost_usd) total += Number(a.cost_usd);
-  return total;
-}
 
 function countWithin(stamps: number[], end: number, windowMs: number): number {
   let n = 0;

@@ -37,7 +37,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-010 | P1 | FIXED | Package verdict cache can preserve a stale `latest` allow indefinitely |
 | JG-011 | P1 | FIXED | Realtime subscriptions are not project-scoped and can mix tenant data |
 | JG-012 | P1 | FIXED | Product claims include Modal, SBOM, and unbypassable enforcement that are not implemented |
-| JG-013 | P1 | OPEN | No project-owned automated tests protect security invariants |
+| JG-013 | P1 | FIXED | No project-owned automated tests protect security invariants |
 | JG-014 | P2 | FIXED | Provider failures produce no action or audit event |
 | JG-015 | P2 | FIXED | Critical suspend/resume actions lack actor, role, reason, and audit history |
 | JG-016 | P2 | FIXED | Production deployment is blocked by localhost-only CORS and missing hosting config |
@@ -376,8 +376,8 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 
 ### JG-013 — No automated security-invariant tests
 
-**Priority:** P1 / High  
-**Status:** OPEN
+**Priority:** P1 / High
+**Status:** FIXED
 
 > **Review comment:** `pytest` discovers no project tests, and there is no
 > frontend test configuration. The current budget, concurrency, auth, and
@@ -401,6 +401,16 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 - Suspended projects block both lanes.
 - Anonymous/cross-project reads fail.
 - Mock, degraded, and live routes remain distinguishable.
+
+**Fix**
+
+- Backend `tests/test_security_invariants.py` covers the acceptance suite against
+  a resettable `MemoryStore` + FastAPI `TestClient`.
+- Frontend Vitest covers mode/data-source resolution and billable spend;
+  `npm run smoke` asserts the production bundle still carries the demo /
+  degraded / simulation labels.
+- `.github/workflows/ci.yml` runs backend pytest, `supabase/verify_migrations.sh`,
+  frontend audit/test/build/smoke on every push and pull request.
 
 ### JG-014 — Provider failures are absent from the audit trail
 
