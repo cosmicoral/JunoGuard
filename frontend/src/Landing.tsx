@@ -76,22 +76,41 @@ export function Landing() {
       </header>
 
       <section className="landing-hero" id="top">
-        <motion.div className="hero-copy" initial={reduce ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, ease: [0.23, 1, 0.32, 1] }}>
-          <p className="eyebrow"><span>01</span> AI RUNTIME DEFENSE</p>
+        <motion.div
+          className="hero-copy"
+          initial={reduce ? false : { opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.65, ease: [0.23, 1, 0.32, 1] }}
+        >
+          <p className="hero-brand">
+            <BrandMark />
+            <span>JUNOGUARD</span>
+          </p>
           <h1>The control plane between your agent and the blast radius.</h1>
-          <p className="hero-lede">JunoGuard sees every install, model call, and policy breach before it lands. One deterministic gate decides what runs, what gets flagged, and what stops.</p>
+          <p className="hero-lede">
+            Every install, model call, and policy breach — decided before it
+            lands. One deterministic gate. Allow, flag, or stop.
+          </p>
           <div className="hero-actions">
-            <a className="primary-action" href="/dashboard">Open live console <span>→</span></a>
-            <a className="text-action" href="#how">See the gate in action</a>
-          </div>
-          <div className="hero-proof">
-            <strong>0</strong>
-            <span>additional LLM calls<br />on the hot path</span>
+            <a className="primary-action" href="/dashboard">
+              Open live console <span>→</span>
+            </a>
+            <a className="text-action" href="#how">
+              See the gate in action
+            </a>
           </div>
         </motion.div>
 
-        <motion.div className="hero-console-wrap" initial={reduce ? false : { opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.12, duration: 0.7, ease: [0.23, 1, 0.32, 1] }}>
-          <div className="console-caption"><span>LIVE PRODUCT SURFACE</span><span>LONDON / 10:41</span></div>
+        <motion.div
+          className="hero-console-wrap"
+          initial={reduce ? false : { opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.12, duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
+        >
+          <div className="console-caption">
+            <span>LIVE PRODUCT SURFACE</span>
+            <span>GATE / ACTIVE</span>
+          </div>
           <DecisionConsole />
         </motion.div>
       </section>
