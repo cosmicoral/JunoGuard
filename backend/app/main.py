@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import config, events, pricing, provider, risk
+from . import config, demo, events, pricing, provider, risk
 from .store import store
 
 app = FastAPI(title="JunoGuard API", version="0.2.0")
@@ -254,6 +254,14 @@ def resume(project: dict[str, Any] = Depends(current_project)) -> dict[str, Any]
 
 
 # --- live feed --------------------------------------------------------------
+
+
+@app.post("/v1/demo/seed")
+def demo_seed(
+    count: int = 28, project: dict[str, Any] = Depends(current_project)
+) -> dict[str, Any]:
+    """Backfill plausible history. Demo tooling — backdated, policy not applied."""
+    return {"seeded": demo.seed(project, count=count)}
 
 
 @app.get("/v1/events/recent")

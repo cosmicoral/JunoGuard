@@ -59,7 +59,10 @@ class MemoryStore:
     def record_action(self, action: dict[str, Any]) -> str:
         action_id = str(uuid.uuid4())
         with self._lock:
-            self.actions.append({**action, "id": action_id, "created_at": _iso(_now())})
+            # A caller may backdate a row (demo seeding); otherwise stamp now.
+            self.actions.append(
+                {"created_at": _iso(_now()), **action, "id": action_id}
+            )
         return action_id
 
     def daily_spend_usd(self, project_id: str) -> float:
