@@ -1,15 +1,5 @@
 import { motion } from "motion/react";
-
-function JunoMark({ suspended }: { suspended: boolean }) {
-  const color = suspended ? "var(--block)" : "var(--juno)";
-  return (
-    <svg className="mark" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-      <circle cx="10" cy="10" r="8" fill="none" stroke={color} strokeWidth="1.25" opacity="0.4" />
-      <circle cx="10" cy="10" r="5" fill="none" stroke={color} strokeWidth="1.25" opacity="0.7" />
-      <circle cx="10" cy="10" r="2.1" fill={color} />
-    </svg>
-  );
-}
+import { BrandMark } from "./BrandMark";
 
 export function Header({
   projectName,
@@ -43,7 +33,7 @@ export function Header({
   return (
     <header className="panel header" data-suspended={suspended}>
       <div className="brand">
-        <JunoMark suspended={suspended} />
+        <BrandMark className="mark" size={20} suspended={suspended} />
         <span className="wordmark">JUNO</span>
       </div>
 

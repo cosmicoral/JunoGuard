@@ -5,25 +5,27 @@
    ========================================================================== */
 
 :root {
-  --bg: #0a0c0e;
-  --panel: #14171a;
-  --panel-hi: #191d21;
+  --bg: #0B1220;
+  --panel: #17202E;
+  --panel-hi: #1F2937;
   --border: #232830;
-  --text: #e6e9ec;
-  --muted: #8a929c;
+  --text: #F8FAFC;
+  --muted: #64748B;
 
-  --allow: #3fb950;
+  --accent: #00C16A;
+  --allow: #00C16A;
   --block: #f85149;
   --flag: #d29922;
-  --juno: #e3b341;
+  --accent-soft: #D1FAE5;
+  --juno: #00C16A;
 
   --block-wash: rgba(248, 81, 73, 0.055);
   --block-flash: rgba(248, 81, 73, 0.22);
 
   --mono: "IBM Plex Mono", "Berkeley Mono", "JetBrains Mono", ui-monospace,
     SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --sans: "Syne", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --display: "Syne", ui-sans-serif, system-ui, sans-serif;
+  --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: "Inter", ui-sans-serif, system-ui, sans-serif;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 

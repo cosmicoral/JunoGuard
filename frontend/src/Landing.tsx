@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { BrandMark } from "./components/BrandMark";
 import { AGENT_MARKS, STACK_MARKS } from "./components/SystemMarks";
 
 const PACKAGE = "@heysalad/junoguard";
@@ -52,22 +53,12 @@ const decisions = [
   { time: "10:40:53", lane: "LLM", target: "gpt-5 · burst detected", verdict: "FLAG", tone: "flag" },
 ];
 
-function BrandMark() {
-  return (
-    <span className="landing-mark" aria-hidden="true">
-      <span />
-      <span />
-      <span />
-    </span>
-  );
-}
-
 function DecisionConsole() {
   return (
     <div className="decision-console" aria-label="Example JunoGuard decision console">
       <div className="console-bar">
         <div className="console-project">
-          <BrandMark />
+          <BrandMark className="landing-mark" size={19} />
           <span>PROJECT / TOKEN-GUARD</span>
         </div>
         <span className="console-live"><i />GATE ACTIVE</span>
@@ -108,7 +99,7 @@ export function Landing() {
     <main className="landing-shell">
       <header className="landing-nav">
         <a className="landing-brand" href="#top" aria-label="JunoGuard home">
-          <BrandMark />
+          <BrandMark className="landing-mark" size={29} />
           <span>JUNOGUARD</span>
         </a>
         <nav aria-label="Primary navigation">
@@ -287,7 +278,7 @@ export function Landing() {
       </section>
 
       <footer className="landing-footer">
-        <a className="landing-brand" href="#top"><BrandMark /><span>JUNOGUARD</span></a>
+        <a className="landing-brand" href="#top"><BrandMark className="landing-mark" size={29} /><span>JUNOGUARD</span></a>
         <p>The supervision layer for AI coding agents.</p>
         <span>BUILT IN LONDON · 2026</span>
       </footer>
