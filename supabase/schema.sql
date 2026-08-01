@@ -123,6 +123,9 @@ create index if not exists incidents_project_time_idx
 
 -- ---------------------------------------------------------------------------
 -- Spend rollup — read on every Lane B request, so keep it cheap.
+--
+-- Billable spend is any action that cost money, whatever the gateway labelled
+-- it. `flag` is proceedable: the provider is called and the charge is real.
 -- ---------------------------------------------------------------------------
 
 create or replace function daily_spend_usd(p_project_id uuid)
@@ -133,7 +136,7 @@ as $$
     select coalesce(sum(cost_usd), 0)
     from agent_actions
     where project_id = p_project_id
-      and decision = 'allow'
+      and cost_usd > 0
       and created_at >= date_trunc('day', now());
 $$;
 

@@ -31,9 +31,15 @@ const SPARK_WINDOW_MS = 20_000;
 const SPARK_SAMPLES = 26;
 const SPARK_STEP_MS = 4_000;
 
-function sumAllowedCost(rows: AgentAction[]): number {
+/**
+ * Billable spend is any action that cost money, whatever it was labelled.
+ * `flag` is proceedable — the provider was called and the charge is real — so
+ * filtering to `allow` here understated spend exactly when it mattered most,
+ * above the 80% threshold where decisions start coming back flagged.
+ */
+function sumBillableCost(rows: AgentAction[]): number {
   let total = 0;
-  for (const a of rows) if (a.decision === "allow" && a.cost_usd) total += Number(a.cost_usd);
+  for (const a of rows) if (a.cost_usd) total += Number(a.cost_usd);
   return total;
 }
 
@@ -130,7 +136,7 @@ export function useJuno(): JunoState {
   // figures fall as old rows are trimmed off the end, which is worse than
   // wrong — it looks like the numbers are drifting on stage.
   const [spendToday, setSpendToday] = useState(
-    () => (isLive ? 0 : SPEND_EARLIER_TODAY) + sumAllowedCost(seed.actions),
+    () => (isLive ? 0 : SPEND_EARLIER_TODAY) + sumBillableCost(seed.actions),
   );
   const [blockedCount, setBlockedCount] = useState(
     () => seed.actions.filter((a) => a.decision === "block").length,
@@ -160,7 +166,7 @@ export function useJuno(): JunoState {
       seenIds.current.add(a.id);
       if (fresh) freshIds.current.add(a.id);
     }
-    setSpendToday((prev) => prev + sumAllowedCost(novel));
+    setSpendToday((prev) => prev + sumBillableCost(novel));
     setBlockedCount((prev) => prev + novel.filter((a) => a.decision === "block").length);
     setActions((prev) => {
       const merged = [...prev, ...novel].sort(
@@ -242,7 +248,7 @@ export function useJuno(): JunoState {
         const ordered = (rows as AgentAction[]).slice().reverse();
         for (const a of ordered) seenIds.current.add(a.id);
         setActions(ordered);
-        setSpendToday(sumAllowedCost(ordered));
+        setSpendToday(sumBillableCost(ordered));
         setBlockedCount(ordered.filter((a) => a.decision === "block").length);
       }
       setIncidents((incs as Incident[]) ?? []);
@@ -365,7 +371,7 @@ export function useJuno(): JunoState {
         for (const a of fallback) seenIds.current.add(a.id);
         setActions(fallback);
         setIncidents(seedIncidents(fallback));
-        setSpendToday(SPEND_EARLIER_TODAY + sumAllowedCost(fallback));
+        setSpendToday(SPEND_EARLIER_TODAY + sumBillableCost(fallback));
         setBlockedCount(fallback.filter((a) => a.decision === "block").length);
         setPolicy(MOCK_POLICY);
         setGatewayDown(true);

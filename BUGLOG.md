@@ -27,7 +27,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 |---|---:|---|---|
 | JG-001 | P0 | FIXED | Authenticated users can read every project, including plaintext agent API keys |
 | JG-002 | P0 | FIXED | Rate and budget enforcement is non-atomic under concurrency |
-| JG-003 | P0 | OPEN | Charged `flag` decisions are excluded from daily spend |
+| JG-003 | P0 | FIXED | Charged `flag` decisions are excluded from daily spend |
 | JG-004 | P0 | OPEN | Scanner outage produces a proceedable `flag` instead of failing closed |
 | JG-005 | P1 | OPEN | Event backfill and SSE stream are unauthenticated and global |
 | JG-006 | P1 | OPEN | OAuth does not protect kill-switch operations; the browser ships an agent key |
@@ -124,7 +124,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-003 — Flagged provider charges disappear from daily spend
 
 **Priority:** P0 / Critical  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** `flag` is a proceedable decision and the provider is
 > called for it, but both spend implementations total only rows whose decision

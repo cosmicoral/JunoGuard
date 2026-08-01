@@ -140,11 +140,18 @@ class MemoryStore:
         return action_id
 
     def daily_spend_usd(self, project_id: str) -> float:
+        """Every charged action, whatever it was labelled.
+
+        `flag` is a proceedable decision — the provider is called and the money
+        is spent. Totalling only `allow` rows meant that once the 80% warning
+        threshold flipped decisions to `flag`, real charges stopped advancing
+        the daily total and the cap could be walked straight past.
+        """
         midnight = _now().replace(hour=0, minute=0, second=0, microsecond=0)
         return sum(
             a.get("cost_usd") or 0.0
             for a in self.actions
-            if a["decision"] == "allow"
+            if (a.get("cost_usd") or 0.0) > 0
             and datetime.fromisoformat(a["created_at"]) >= midnight
         )
 

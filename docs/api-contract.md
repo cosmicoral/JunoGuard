@@ -113,6 +113,11 @@ toward both limits until the action is recorded. At most
 
 Cheap. Safe to poll. Lets the agent check its own budget before acting.
 
+`spend_today_usd` counts **every charged action**, not only allowed ones. A
+`flag` is proceedable — the provider is called and the money is spent — so a
+flagged call advances the daily total exactly like an allowed one. Blocked calls
+cost nothing and do not.
+
 ```jsonc
 {
   "project": "Demo Project",
