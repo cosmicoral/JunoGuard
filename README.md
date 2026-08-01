@@ -83,7 +83,7 @@ Every action an agent takes flows through one gate.
    chain   |               |  & cost
            v               v
    Ossprey scan      Policy engine
-   Modal sandbox     Cost calculator
+                     Cost calculator
            |               |
            +-------+-------+
                    |
@@ -111,7 +111,9 @@ Every hot-path decision is deterministic: package verdicts, token estimation, co
 Additional LLM calls on the hot path:  0
 ```
 
-AI runs on the **cold path** only — Modal sandboxes and analyses packages that have already been flagged, out of band, where latency and cost do not matter. Fast and free where it has to be, deep where it is worth it.
+There is no AI on the hot path and, today, none on the cold path either: deep
+out-of-band analysis of flagged packages is designed but not built. See
+[What is actually implemented](#what-is-actually-implemented).
 
 ---
 
@@ -131,7 +133,7 @@ Every package the agent tries to install is intercepted **before** it reaches di
   URL sources — are **refused**, not waved through. Proceeding takes a named
   operator override, and the override is recorded as an audited gap in coverage.
 - **Structured refusal** returned to the agent — a machine-readable reason, so it self-corrects to a safe alternative instead of retrying blindly
-- Flagged packages detonated in a **Modal** sandbox for deeper analysis, off the hot path
+- A scanner outage is refused, not downgraded to a warning: no verdict means no install
 
 ### Lane B — Tokens and cost
 
@@ -178,9 +180,34 @@ Computed from the agent's actual scope. No LLM required.
 | Agent interface | MCP server (Cursor, Claude Code) |
 | Gateway | Python, FastAPI, Pydantic, HTTPX |
 | Supply-chain scanning | Ossprey |
-| Sandboxed analysis | Modal |
 | Database, auth, realtime | Supabase (PostgreSQL, RLS, Realtime) |
 | Dashboard | React, Vite |
+
+---
+
+## What Is Actually Implemented
+
+Every present-tense claim above maps to a code path. This table says which, and
+what is still an intention.
+
+| Capability | State | Where |
+|---|---|---|
+| Pre-install verdicts, block/flag/allow | **live** | `backend/app/risk.py`, `ossprey.py` |
+| Scanner outage refuses the install | **live** | `ossprey.py`, `risk.py` |
+| Unscannable sources refused, audited override | **live** | `packages/junoguard/src/cli.ts`, `POST /v1/guard/unscanned` |
+| Token, per-request and daily budget caps | **live** | `risk.py`, atomic reserve in `store.py` |
+| Burst / rate limiting | **live** | `store.reserve`, SQL `reserve_action` |
+| Kill switch with operator roles and audit | **live** | `auth.py`, `control_events` |
+| Live dashboard, Supabase Realtime and SSE | **live** | `frontend/`, `POST /v1/events/token` |
+| Ossprey verdicts without an API key | **mock** | `ossprey._mock_verdict` — deterministic fixtures |
+| Model provider calls without a key | **mock** | `provider.MOCK_ANSWER` |
+| Blast radius | **mock** | `backend/app/blast.py` — inferred from the local environment, not measured |
+| SBOM generation | **planned** | not implemented; the Ossprey adapter consumes a verdict, not an SBOM |
+| Sandbox detonation of flagged packages | **planned** | no sandbox worker exists |
+| Interception an agent cannot bypass | **planned** | MCP is advisory (see Lane A); no OS or package-manager boundary |
+
+`GET /health` reports `mode: mock` whenever the Ossprey or provider credentials
+are absent, so the running system says which of these it is.
 
 ---
 

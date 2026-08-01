@@ -10,7 +10,7 @@
  * change, the packages are tens of megabytes, and the page must not fetch
  * anything at runtime.
  *   AI brand marks  — @lobehub/icons-static-svg (MIT)
- *   Supabase, Modal — Simple Icons (CC0-1.0)
+ *   Supabase        — Simple Icons (CC0-1.0)
  * The logos remain trademarks of their owners, used here to identify the
  * products JunoGuard interoperates with.
  */
@@ -55,10 +55,6 @@ const SUPABASE = [
   "M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C-.33 13.427.65 15.455 2.409 15.455h9.579l.113 7.51c.014.985 1.259 1.408 1.873.636l9.262-11.653c1.093-1.375.113-3.403-1.645-3.403h-9.642z",
 ];
 
-const MODAL = [
-  "M4.89 5.57 0 14.002l2.521 4.4h5.05l4.396-7.718 4.512 7.709 4.996.037L24 14.057l-4.857-8.452-5.073-.015-2.076 3.598L9.94 5.57Zm.837.729h3.787l1.845 3.252H7.572Zm9.189.021 3.803.012 4.228 7.355-3.736-.027zm-9.82.346L6.94 9.914l-4.209 7.389-1.892-3.3Zm9.187.014 4.297 7.343-1.892 3.282-4.3-7.344zm-6.713 3.6h3.79l-4.212 7.394H3.361Zm11.64 4.109 3.74.027-1.893 3.281-3.74-.027z",
-];
-
 /** Ossprey has no published mark. A cleared shield until we have their SVG. */
 const OSSPREY = [
   "M12 2.1 3.5 5.05v6.5c0 5.2 3.55 8.98 8.5 10.5 4.95-1.52 8.5-5.3 8.5-10.5v-6.5L12 2.1Zm4.32 7.35a1.2 1.2 0 0 0-1.86-1.52l-3.4 4.16-1.5-1.5a1.2 1.2 0 1 0-1.7 1.7l2.44 2.44a1.2 1.2 0 0 0 1.78-.09l4.24-5.19Z",
@@ -99,5 +95,6 @@ export const STACK_MARKS = [
   { label: "MCP", Mark: mark(MCP) },
   { label: "Ossprey", Mark: mark(OSSPREY) },
   { label: "Supabase", Mark: mark(SUPABASE) },
-  { label: "Modal", Mark: mark(MODAL) },
+  // No Modal: the sandbox it was here for is not implemented, and a logo in a
+  // BUILT ON strip is a claim like any other.
 ] as const;

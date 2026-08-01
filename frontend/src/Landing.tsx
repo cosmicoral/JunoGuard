@@ -206,8 +206,8 @@ export function Landing() {
             </div>
             <ul>
               <li><span>01</span> Pre-install interception</li>
-              <li><span>02</span> Malware and SBOM verdicts</li>
-              <li><span>03</span> Sandboxed deep analysis</li>
+              <li><span>02</span> Malware verdicts from Ossprey</li>
+              <li><span>03</span> No verdict means no install</li>
             </ul>
           </motion.article>
 
@@ -244,7 +244,7 @@ export function Landing() {
           <div><b>~0 ms</b><span>LLM latency added</span></div>
           <div><b>1 gate</b><span>across both lanes</span></div>
           <div><b>100%</b><span>deterministic hot path</span></div>
-          <p>AI runs only on the cold path, where flagged packages can be detonated safely and analyzed without holding up the agent.</p>
+          <p>No AI on the hot path, so a decision costs no tokens and adds no latency. Deep out-of-band analysis of flagged packages is on the roadmap, not in the product.</p>
         </div>
       </section>
 

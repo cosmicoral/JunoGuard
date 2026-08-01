@@ -36,7 +36,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-009 | P1 | FIXED | CLI and MCP enforcement can be bypassed by supported install paths |
 | JG-010 | P1 | FIXED | Package verdict cache can preserve a stale `latest` allow indefinitely |
 | JG-011 | P1 | FIXED | Realtime subscriptions are not project-scoped and can mix tenant data |
-| JG-012 | P1 | OPEN | Product claims include Modal, SBOM, and unbypassable enforcement that are not implemented |
+| JG-012 | P1 | FIXED | Product claims include Modal, SBOM, and unbypassable enforcement that are not implemented |
 | JG-013 | P1 | OPEN | No project-owned automated tests protect security invariants |
 | JG-014 | P2 | FIXED | Provider failures produce no action or audit event |
 | JG-015 | P2 | FIXED | Critical suspend/resume actions lack actor, role, reason, and audit history |
@@ -356,7 +356,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-012 — Documentation overstates implemented guarantees
 
 **Priority:** P1 / High  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** README and landing content claim Modal sandbox detonation,
 > SBOM generation, and interception an agent cannot bypass. No Modal code or
