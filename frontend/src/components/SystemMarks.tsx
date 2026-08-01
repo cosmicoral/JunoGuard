@@ -1,90 +1,103 @@
 /**
- * Marks for the "BUILT FOR" strip.
+ * Brand marks for the landing page's integration strip.
  *
- * Five are the official brand marks, path data copied from Simple Icons
- * (https://simpleicons.org, CC0-1.0) so the strip is instantly recognisable
- * and there is no runtime dependency or CDN fetch for five paths.
+ * Split into two groups because they are two different claims. The first is
+ * what JunoGuard gates — every one is an MCP client, which is the only reason
+ * the claim is true: the agent reaches Juno over MCP, so anything that speaks
+ * MCP is covered. The second is what JunoGuard is built on.
  *
- * Two have no official mark available and are drawn here instead:
- *   Codex   — OpenAI's mark is not in any CC0 set (they asked for its removal),
- *             so this is a neutral terminal prompt rather than a bad trace.
- *   Ossprey — no published brand mark; a raptor, after the name.
- *
- * Brand paths are solid fills on a 24px box; the two drawn glyphs are strokes
- * on the same box, weighted to sit at the same optical density.
+ * Path data is inlined rather than imported. It is a dozen paths that never
+ * change, the packages are tens of megabytes, and the page must not fetch
+ * anything at runtime.
+ *   AI brand marks  — @lobehub/icons-static-svg (MIT)
+ *   Supabase, Modal — Simple Icons (CC0-1.0)
+ * The logos remain trademarks of their owners, used here to identify the
+ * products JunoGuard interoperates with.
  */
 
 type MarkProps = { className?: string };
 
-const FILL = {
-  viewBox: "0 0 24 24",
-  fill: "currentColor",
-  "aria-hidden": true,
-} as const;
+const CHATGPT = [
+  "M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357 1.356-.523 2.117-.523 2.854 0 4.662 2.212 4.662 4.566 0 .167 0 .357-.024.547l-4.71-2.759a.797.797 0 00-.856 0l-5.97 3.473zm10.609 8.8V12.06c0-.333-.143-.57-.429-.737l-5.97-3.473 1.95-1.118a.433.433 0 01.476 0l4.543 2.617c1.309.76 2.189 2.378 2.189 3.948 0 1.808-1.07 3.473-2.76 4.163zM7.802 12.703l-1.95-1.142c-.167-.095-.239-.238-.239-.428V5.899c0-2.545 1.95-4.472 4.591-4.472 1 0 1.927.333 2.712.928L8.23 5.067c-.285.166-.428.404-.428.737v6.898zM12 15.128l-2.795-1.57v-3.33L12 8.658l2.795 1.57v3.33L12 15.128zm1.796 7.23c-1 0-1.927-.332-2.712-.927l4.686-2.712c.285-.166.428-.404.428-.737v-6.898l1.974 1.142c.167.095.238.238.238.428v5.233c0 2.545-1.974 4.472-4.614 4.472zm-5.637-5.303l-4.544-2.617c-1.308-.761-2.188-2.378-2.188-3.948A4.482 4.482 0 014.21 6.327v5.423c0 .333.143.571.428.738l5.947 3.449-1.95 1.118a.432.432 0 01-.476 0zm-.262 3.9c-2.688 0-4.662-2.021-4.662-4.519 0-.19.024-.38.047-.57l4.686 2.71c.286.167.571.167.856 0l5.97-3.448v2.26c0 .19-.07.333-.237.428l-4.543 2.616c-.619.357-1.356.523-2.117.523zm5.899 2.83a5.947 5.947 0 005.827-4.756C22.287 18.339 24 15.84 24 13.296c0-1.665-.713-3.282-1.998-4.448.119-.5.19-.999.19-1.498 0-3.401-2.759-5.947-5.946-5.947-.642 0-1.26.095-1.88.31A5.962 5.962 0 0010.205 0a5.947 5.947 0 00-5.827 4.757C1.713 5.447 0 7.945 0 10.49c0 1.666.713 3.283 1.998 4.448-.119.5-.19 1-.19 1.499 0 3.401 2.759 5.946 5.946 5.946.642 0 1.26-.095 1.88-.309a5.96 5.96 0 004.162 1.713z",
+];
 
-/* The five brand marks are solid fills. The two drawn ones are too, or they
-   read a full step lighter than their neighbours at 21px. */
+const CURSOR = [
+  "M22.106 5.68L12.5.135a.998.998 0 00-.998 0L1.893 5.68a.84.84 0 00-.419.726v11.186c0 .3.16.577.42.727l9.607 5.547a.999.999 0 00.998 0l9.608-5.547a.84.84 0 00.42-.727V6.407a.84.84 0 00-.42-.726zm-.603 1.176L12.228 22.92c-.063.108-.228.064-.228-.061V12.34a.59.59 0 00-.295-.51l-9.11-5.26c-.107-.062-.063-.228.062-.228h18.55c.264 0 .428.286.296.514z",
+];
 
-/* -- official marks, Simple Icons (CC0-1.0) -------------------------------- */
+const CLAUDE_CODE = [
+  "M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z",
+];
 
-const MCP_PATH =
-  "M13.85 0a4.16 4.16 0 0 0-2.95 1.217L1.456 10.66a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l9.442-9.442a2.49 2.49 0 0 1 3.541 0 2.49 2.49 0 0 1 0 3.541L8.59 12.97l-.1.1a.835.835 0 0 0 0 1.18.835.835 0 0 0 1.18 0l.1-.098 7.03-7.034a2.49 2.49 0 0 1 3.542 0l.049.05a2.49 2.49 0 0 1 0 3.54l-8.54 8.54a1.96 1.96 0 0 0 0 2.755l1.753 1.753a.835.835 0 0 0 1.18 0 .835.835 0 0 0 0-1.18l-1.753-1.753a.266.266 0 0 1 0-.394l8.54-8.54a4.185 4.185 0 0 0 0-5.9l-.05-.05a4.16 4.16 0 0 0-2.95-1.218c-.2 0-.401.02-.6.048a4.17 4.17 0 0 0-1.17-3.552A4.16 4.16 0 0 0 13.85 0m0 3.333a.84.84 0 0 0-.59.245L6.275 10.56a4.186 4.186 0 0 0 0 5.902 4.186 4.186 0 0 0 5.902 0L19.16 9.48a.835.835 0 0 0 0-1.18.835.835 0 0 0-1.18 0l-6.985 6.984a2.49 2.49 0 0 1-3.54 0 2.49 2.49 0 0 1 0-3.54l6.983-6.985a.835.835 0 0 0 0-1.18.84.84 0 0 0-.59-.245";
+const COPILOT = [
+  "M9 23l.073-.001a2.53 2.53 0 01-2.347-1.838l-.697-2.433a2.529 2.529 0 00-2.426-1.839h-.497l-.104-.002c-4.485 0-2.935-5.278-1.75-9.225l.162-.525C2.412 3.99 3.883 1 6.25 1h8.86c1.12 0 2.106.745 2.422 1.829l.715 2.453a2.53 2.53 0 002.247 1.823l.147.005.534.001c3.557.115 3.088 3.745 2.156 7.206l-.113.413c-.154.548-.315 1.089-.47 1.607l-.163.525C21.588 20.01 20.116 23 17.75 23h-8.75zm8.22-15.89l-3.856.001a2.526 2.526 0 00-2.35 1.615L9.21 15.04a2.529 2.529 0 01-2.43 1.847l3.853.002c1.056 0 1.992-.661 2.361-1.644l1.796-6.287a2.529 2.529 0 012.43-1.848z",
+];
 
-const CURSOR_PATH =
-  "M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23";
+const WINDSURF = [
+  "M23.78 5.004h-.228a2.187 2.187 0 00-2.18 2.196v4.912c0 .98-.804 1.775-1.76 1.775a1.818 1.818 0 01-1.472-.773L13.168 5.95a2.197 2.197 0 00-1.81-.95c-1.134 0-2.154.972-2.154 2.173v4.94c0 .98-.797 1.775-1.76 1.775-.57 0-1.136-.289-1.472-.773L.408 5.098C.282 4.918 0 5.007 0 5.228v4.284c0 .216.066.426.188.604l5.475 7.889c.324.466.8.812 1.351.938 1.377.316 2.645-.754 2.645-2.117V11.89c0-.98.787-1.775 1.76-1.775h.002c.586 0 1.135.288 1.472.773l4.972 7.163a2.15 2.15 0 001.81.95c1.158 0 2.151-.973 2.151-2.173v-4.939c0-.98.787-1.775 1.76-1.775h.194c.122 0 .22-.1.22-.222V5.225a.221.221 0 00-.22-.222z",
+];
 
-const CLAUDE_CODE_PATH =
-  "M21 10.5h3v3h-3v3h-1.5v3H18v-3h-1.5v3H15v-3H9v3H7.5v-3H6v3H4.5v-3H3v-3H0v-3h3v-6h18Zm-15 0h1.5v-3H6Zm10.5 0H18v-3h-1.5z";
+const CLINE = [
+  "M17.035 3.991c2.75 0 4.98 2.24 4.98 5.003v1.667l1.45 2.896a1.01 1.01 0 01-.002.909l-1.448 2.864v1.668c0 2.762-2.23 5.002-4.98 5.002H7.074c-2.751 0-4.98-2.24-4.98-5.002V17.33l-1.48-2.855a1.01 1.01 0 01-.003-.927l1.482-2.887V8.994c0-2.763 2.23-5.003 4.98-5.003h9.962zM8.265 9.6a2.274 2.274 0 00-2.274 2.274v4.042a2.274 2.274 0 004.547 0v-4.042A2.274 2.274 0 008.265 9.6zm7.326 0a2.274 2.274 0 00-2.274 2.274v4.042a2.274 2.274 0 104.548 0v-4.042A2.274 2.274 0 0015.59 9.6z",
+  "M12.054 5.558a2.779 2.779 0 100-5.558 2.779 2.779 0 000 5.558z",
+];
 
-const SUPABASE_PATH =
-  "M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C-.33 13.427.65 15.455 2.409 15.455h9.579l.113 7.51c.014.985 1.259 1.408 1.873.636l9.262-11.653c1.093-1.375.113-3.403-1.645-3.403h-9.642z";
+const GEMINI = [
+  "M20.616 10.835a14.147 14.147 0 01-4.45-3.001 14.111 14.111 0 01-3.678-6.452.503.503 0 00-.975 0 14.134 14.134 0 01-3.679 6.452 14.155 14.155 0 01-4.45 3.001c-.65.28-1.318.505-2.002.678a.502.502 0 000 .975c.684.172 1.35.397 2.002.677a14.147 14.147 0 014.45 3.001 14.112 14.112 0 013.679 6.453.502.502 0 00.975 0c.172-.685.397-1.351.677-2.003a14.145 14.145 0 013.001-4.45 14.113 14.113 0 016.453-3.678.503.503 0 000-.975 13.245 13.245 0 01-2.003-.678z",
+];
 
-const MODAL_PATH =
-  "M4.89 5.57 0 14.002l2.521 4.4h5.05l4.396-7.718 4.512 7.709 4.996.037L24 14.057l-4.857-8.452-5.073-.015-2.076 3.598L9.94 5.57Zm.837.729h3.787l1.845 3.252H7.572Zm9.189.021 3.803.012 4.228 7.355-3.736-.027zm-9.82.346L6.94 9.914l-4.209 7.389-1.892-3.3Zm9.187.014 4.297 7.343-1.892 3.282-4.3-7.344zm-6.713 3.6h3.79l-4.212 7.394H3.361Zm11.64 4.109 3.74.027-1.893 3.281-3.74-.027z";
+const MCP = [
+  "M15.688 2.343a2.588 2.588 0 00-3.61 0l-9.626 9.44a.863.863 0 01-1.203 0 .823.823 0 010-1.18l9.626-9.44a4.313 4.313 0 016.016 0 4.116 4.116 0 011.204 3.54 4.3 4.3 0 013.609 1.18l.05.05a4.115 4.115 0 010 5.9l-8.706 8.537a.274.274 0 000 .393l1.788 1.754a.823.823 0 010 1.18.863.863 0 01-1.203 0l-1.788-1.753a1.92 1.92 0 010-2.754l8.706-8.538a2.47 2.47 0 000-3.54l-.05-.049a2.588 2.588 0 00-3.607-.003l-7.172 7.034-.002.002-.098.097a.863.863 0 01-1.204 0 .823.823 0 010-1.18l7.273-7.133a2.47 2.47 0 00-.003-3.537z",
+  "M14.485 4.703a.823.823 0 000-1.18.863.863 0 00-1.204 0l-7.119 6.982a4.115 4.115 0 000 5.9 4.314 4.314 0 006.016 0l7.12-6.982a.823.823 0 000-1.18.863.863 0 00-1.204 0l-7.119 6.982a2.588 2.588 0 01-3.61 0 2.47 2.47 0 010-3.54l7.12-6.982z",
+];
 
-function brandMark(path: string) {
-  return function Brand(props: MarkProps) {
+const SUPABASE = [
+  "M11.9 1.036c-.015-.986-1.26-1.41-1.874-.637L.764 12.05C-.33 13.427.65 15.455 2.409 15.455h9.579l.113 7.51c.014.985 1.259 1.408 1.873.636l9.262-11.653c1.093-1.375.113-3.403-1.645-3.403h-9.642z",
+];
+
+const MODAL = [
+  "M4.89 5.57 0 14.002l2.521 4.4h5.05l4.396-7.718 4.512 7.709 4.996.037L24 14.057l-4.857-8.452-5.073-.015-2.076 3.598L9.94 5.57Zm.837.729h3.787l1.845 3.252H7.572Zm9.189.021 3.803.012 4.228 7.355-3.736-.027zm-9.82.346L6.94 9.914l-4.209 7.389-1.892-3.3Zm9.187.014 4.297 7.343-1.892 3.282-4.3-7.344zm-6.713 3.6h3.79l-4.212 7.394H3.361Zm11.64 4.109 3.74.027-1.893 3.281-3.74-.027z",
+];
+
+/** Ossprey has no published mark. A cleared shield until we have their SVG. */
+const OSSPREY = [
+  "M12 2.1 3.5 5.05v6.5c0 5.2 3.55 8.98 8.5 10.5 4.95-1.52 8.5-5.3 8.5-10.5v-6.5L12 2.1Zm4.32 7.35a1.2 1.2 0 0 0-1.86-1.52l-3.4 4.16-1.5-1.5a1.2 1.2 0 1 0-1.7 1.7l2.44 2.44a1.2 1.2 0 0 0 1.78-.09l4.24-5.19Z",
+];
+
+function mark(paths: readonly string[]) {
+  return function Brand({ className }: MarkProps) {
     return (
-      <svg {...FILL} {...props}>
-        <path d={path} />
+      <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        className={className}
+        aria-hidden
+      >
+        {paths.map((d) => (
+          <path key={d.slice(0, 24)} d={d} />
+        ))}
       </svg>
     );
   };
 }
 
-/* -- drawn stand-ins, no official mark available --------------------------- */
+/** What Juno gates. All MCP clients — that is what makes the claim true. */
+export const AGENT_MARKS = [
+  { label: "Cursor", Mark: mark(CURSOR) },
+  { label: "Claude Code", Mark: mark(CLAUDE_CODE) },
+  { label: "ChatGPT", Mark: mark(CHATGPT) },
+  { label: "Copilot", Mark: mark(COPILOT) },
+  { label: "Windsurf", Mark: mark(WINDSURF) },
+  { label: "Cline", Mark: mark(CLINE) },
+  { label: "Gemini CLI", Mark: mark(GEMINI) },
+] as const;
 
-/** Codex — a shell prompt. No frame: it keeps the weight near MCP and Modal. */
-function MarkCodex(props: MarkProps) {
-  return (
-    <svg {...FILL} {...props}>
-      <path d="M4.42 4.3a1.5 1.5 0 0 0-2.02 2.22l4.9 4.45a1.4 1.4 0 0 1 0 2.06l-4.9 4.45a1.5 1.5 0 0 0 2.02 2.22l6.1-5.54a2.6 2.6 0 0 0 0-3.84L4.42 4.3Z" />
-      <rect x="11.6" y="16.8" width="10.4" height="2.9" rx="1.45" />
-    </svg>
-  );
-}
-
-/**
- * Ossprey — a cleared shield. Swap this the moment we have their real SVG.
- *
- * A raptor was the obvious read on the name, but at 21px every version of it
- * came out as a wine glass. The shield says "package cleared" instantly, which
- * is what Ossprey does here, and the wordmark beside it carries the identity.
- */
-function MarkOssprey(props: MarkProps) {
-  return (
-    <svg {...FILL} {...props} fillRule="evenodd" clipRule="evenodd">
-      <path d="M12 2.1 3.5 5.05v6.5c0 5.2 3.55 8.98 8.5 10.5 4.95-1.52 8.5-5.3 8.5-10.5v-6.5L12 2.1Zm4.32 7.35a1.2 1.2 0 0 0-1.86-1.52l-3.4 4.16-1.5-1.5a1.2 1.2 0 1 0-1.7 1.7l2.44 2.44a1.2 1.2 0 0 0 1.78-.09l4.24-5.19Z" />
-    </svg>
-  );
-}
-
-export const SYSTEM_MARKS = [
-  { label: "MCP", Mark: brandMark(MCP_PATH) },
-  { label: "Cursor", Mark: brandMark(CURSOR_PATH) },
-  { label: "Claude Code", Mark: brandMark(CLAUDE_CODE_PATH) },
-  { label: "Codex", Mark: MarkCodex },
-  { label: "Ossprey", Mark: MarkOssprey },
-  { label: "Supabase", Mark: brandMark(SUPABASE_PATH) },
-  { label: "Modal", Mark: brandMark(MODAL_PATH) },
+/** What Juno is built on. */
+export const STACK_MARKS = [
+  { label: "MCP", Mark: mark(MCP) },
+  { label: "Ossprey", Mark: mark(OSSPREY) },
+  { label: "Supabase", Mark: mark(SUPABASE) },
+  { label: "Modal", Mark: mark(MODAL) },
 ] as const;

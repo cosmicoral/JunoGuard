@@ -1317,14 +1317,16 @@ body[data-suspended="true"] {
 .blast-preview div { color: #8e9294; font-family: var(--mono); font-size: 9px; }
 .blast-preview b { color: #f2f0ea; font-size: 13px; margin-right: 3px; }
 
+/* Two rows, two claims: what Juno gates, and what Juno runs on. Collapsing
+   them into one row read as undifferentiated logo soup. */
 .system-strip {
-  min-height: 76px;
   display: grid;
-  grid-template-columns: 160px 1fr;
+  grid-template-columns: 108px 1fr;
   align-items: center;
+  row-gap: 18px;
   border-top: 1px solid var(--landing-gold);
   border-bottom: 1px solid var(--landing-line);
-  padding: 0 max(32px, calc((100vw - 1400px) / 2));
+  padding: 22px max(32px, calc((100vw - 1400px) / 2));
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.13em;
@@ -1333,8 +1335,9 @@ body[data-suspended="true"] {
 
 .system-strip > div {
   display: flex;
-  justify-content: space-between;
-  gap: 24px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 30px;
   color: #aaa9a3;
   font-size: 10px;
 }
