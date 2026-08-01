@@ -11,3 +11,14 @@ Use this Git workflow for every change in this repository:
 7. Verify that local `main` is clean and matches `origin/main` after the push.
 
 Do not force-push or rewrite `main` history. If `main` cannot be fast-forwarded or a merge has conflicts, stop and resolve the discrepancy explicitly before continuing.
+
+## Cursor Cloud specific instructions
+
+Cloud agents use `.cursor/environment.json` (and `.cursor/Dockerfile`) for this repo.
+
+- Dependencies are installed by the environment `install` script: backend requirements, editable `mcp`/`cli`, and `npm ci` for `frontend` and `packages/junoguard`.
+- Gateway and dashboard terminals start automatically on `:8000` and `:5173`. Prefer `GET /ready` over `/health` when checking a production-shaped gateway.
+- For production-shaped deploys, set `JUNO_ENV=production` and follow `docs/deploy.md`. Demo/local work can omit secrets and stay in mock mode.
+- Never put `SUPABASE_SERVICE_ROLE_KEY`, `OPERATOR_TOKEN`, or `STREAM_TOKEN_SECRET` in `VITE_*` variables.
+- Database migrations: `DATABASE_URL='postgres://…' ./supabase/apply.sh` (see `docs/deploy.md`).
+- Secrets belong in the Cloud Agents dashboard Secrets tab, not in committed files.

@@ -1,0 +1,25 @@
+{
+  "name": "junoguard",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "install": "python3 -m pip install --break-system-packages -r backend/requirements.txt && python3 -m pip install --break-system-packages -e './mcp' -e './cli' && npm ci --prefix frontend && npm ci --prefix packages/junoguard",
+  "start": "sudo service docker start || sudo dockerd >/tmp/dockerd.log 2>&1 & sleep 1",
+  "ports": [
+    { "name": "gateway", "port": 8000 },
+    { "name": "dashboard", "port": 5173 }
+  ],
+  "terminals": [
+    {
+      "name": "gateway",
+      "command": "cd backend && python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+      "description": "JunoGuard FastAPI gateway on :8000 (mock-friendly without secrets). Health: /health, readiness: /ready."
+    },
+    {
+      "name": "dashboard",
+      "command": "cd frontend && npm run dev -- --host 0.0.0.0 --port 5173",
+      "description": "Vite dashboard on :5173. Point VITE_API_URL at http://localhost:8000 for local gateway."
+    }
+  ]
+}
