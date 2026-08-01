@@ -103,6 +103,7 @@ class MemoryStore:
         self.policy = dict(config.DEFAULT_POLICY)
         self.actions: list[dict[str, Any]] = []
         self.incidents: list[dict[str, Any]] = []
+        self.control_events: list[dict[str, Any]] = []
         # Held for the whole of reserve(), so this backend enforces limits with
         # the same semantics as the SQL advisory lock rather than only looking
         # like it does under a single-threaded demo.
@@ -272,6 +273,27 @@ class MemoryStore:
     def open_incidents(self, project_id: str) -> int:
         return sum(1 for i in self.incidents if i["status"] == "open")
 
+    def open_critical_incidents(self, project_id: str) -> list[dict[str, Any]]:
+        return [
+            i
+            for i in self.incidents
+            if i["status"] == "open" and i.get("severity") in {"critical", "high"}
+        ]
+
+    # --- control events -----------------------------------------------------
+
+    def record_control_event(self, event: dict[str, Any]) -> str:
+        event_id = str(uuid.uuid4())
+        with self._lock:
+            self.control_events.append(
+                {**event, "id": event_id, "created_at": _iso(_now())}
+            )
+        return event_id
+
+    def recent_control_events(self, project_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        mine = [e for e in self.control_events if e["project_id"] == project_id]
+        return list(reversed(mine))[:limit]
+
 
 class SupabaseStore:
     """PostgREST over HTTP. No SDK — one dependency fewer to go wrong."""
@@ -410,6 +432,34 @@ class SupabaseStore:
             "/incidents", project_id=f"eq.{project_id}", status="eq.open", select="id"
         )
         return len(rows)
+
+    def open_critical_incidents(self, project_id: str) -> list[dict[str, Any]]:
+        return self._get(
+            "/incidents",
+            project_id=f"eq.{project_id}",
+            status="eq.open",
+            severity="in.(critical,high)",
+            select="id,severity,title,created_at",
+            order="created_at.desc",
+        )
+
+    # --- control events -----------------------------------------------------
+
+    def record_control_event(self, event: dict[str, Any]) -> str:
+        r = self._client.post(
+            "/control_events", json=event, headers={"Prefer": "return=representation"}
+        )
+        r.raise_for_status()
+        return r.json()[0]["id"]
+
+    def recent_control_events(self, project_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        return self._get(
+            "/control_events",
+            project_id=f"eq.{project_id}",
+            select="*",
+            order="created_at.desc",
+            limit=limit,
+        )
 
     # --- reservations -------------------------------------------------------
 

@@ -127,6 +127,13 @@ class SuspendRequest(BaseModel):
 
 class ResumeRequest(BaseModel):
     project_id: str | None = None
+    # Required when the project is carrying an open high or critical incident:
+    # bringing a project back after a malware block is a decision that should
+    # have a sentence attached to it.
+    reason: str | None = None
+    # The incident the operator is attesting to have reviewed. An operator
+    # (rather than an owner) may only resume by naming one.
+    incident_id: str | None = None
 
 
 # --- helpers ----------------------------------------------------------------
@@ -498,7 +505,18 @@ def suspend(
     project, actor = controlled_project(
         payload.project_id, authorization, x_juno_operator, "operator", "Suspending a project"
     )
+    previous = project["status"]
     updated = store.set_status(project["id"], "suspended", payload.reason)
+    store.record_control_event(
+        {
+            "project_id": project["id"],
+            "action": "suspend",
+            "previous_status": previous,
+            "next_status": "suspended",
+            "reason": payload.reason,
+            **actor.audit(),
+        }
+    )
     events.publish(
         "project",
         project["id"],
@@ -515,18 +533,78 @@ def resume(
     authorization: str = Header(default=""),
     x_juno_operator: str = Header(default=""),
 ) -> dict[str, Any]:
-    """Bringing a project back is the higher bar of the two: owner only.
+    """Bringing a project back is the higher bar of the two.
 
-    Stopping something should be easy and reversing it should be deliberate.
+    Stopping something should be easy and reversing it should be deliberate. An
+    owner may resume outright. An operator may only resume by naming the incident
+    they reviewed — which is what makes them a reviewed operator rather than
+    someone who found the button.
     """
+    reviewed = bool(payload.reason and payload.incident_id)
+    minimum = "operator" if reviewed else "owner"
     project, actor = controlled_project(
-        payload.project_id, authorization, x_juno_operator, "owner", "Resuming a project"
+        payload.project_id, authorization, x_juno_operator, minimum, "Resuming a project"
     )
+    if not reviewed and not actor.can("owner"):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "review_required",
+                "detail": "An operator may resume only with a reason and the "
+                "incident_id they reviewed. An owner may resume outright.",
+            },
+        )
+
+    # A project carrying an open high or critical incident does not come back
+    # without a sentence explaining why it should.
+    blocking = store.open_critical_incidents(project["id"])
+    if blocking and not (payload.reason and len(payload.reason.strip()) >= 8):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "reason_required",
+                "detail": (
+                    f"This project has {len(blocking)} open high or critical "
+                    f"incident(s). Resuming requires a reason of at least 8 "
+                    f"characters."
+                ),
+                "open_incidents": blocking[:5],
+            },
+        )
+
+    previous = project["status"]
     updated = store.set_status(project["id"], "active", None)
+    store.record_control_event(
+        {
+            "project_id": project["id"],
+            "action": "resume",
+            "previous_status": previous,
+            "next_status": "active",
+            "reason": payload.reason,
+            "incident_id": payload.incident_id,
+            **actor.audit(),
+        }
+    )
     events.publish(
-        "project", project["id"], {"status": "active", "reason": None} | actor.audit()
+        "project",
+        project["id"],
+        {"status": "active", "reason": payload.reason} | actor.audit(),
     )
     return public_project(updated) | {"actor": actor.audit()}
+
+
+@app.get("/v1/projects/control-events")
+def control_events(
+    project_id: str | None = None,
+    limit: int = 20,
+    authorization: str = Header(default=""),
+    x_juno_operator: str = Header(default=""),
+) -> dict[str, Any]:
+    """Who changed this project's state, when, why, and after reviewing what."""
+    project, _ = controlled_project(
+        project_id, authorization, x_juno_operator, "viewer", "Reading control history"
+    )
+    return {"events": store.recent_control_events(project["id"], limit)}
 
 
 # --- live feed --------------------------------------------------------------

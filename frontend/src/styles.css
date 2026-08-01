@@ -303,6 +303,22 @@ body[data-suspended="true"] {
   outline-offset: 2px;
 }
 
+/* Who last took this project down or brought it back, and why. */
+.control-history {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  padding: 0 2px;
+}
+
+.control-history strong {
+  color: var(--text);
+  letter-spacing: 0.08em;
+}
+
 /* No readable project for this account. Says so instead of showing zeroes. */
 .access-notice {
   font-family: var(--mono);

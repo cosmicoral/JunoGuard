@@ -130,6 +130,18 @@ export function Dashboard() {
           onToggleSuspend={juno.toggleSuspend}
         />
 
+        {juno.lastControl && (
+          <p className="control-history">
+            Last state change:{" "}
+            <strong>{juno.lastControl.action.toUpperCase()}</strong> by{" "}
+            {juno.lastControl.actor_email ?? juno.lastControl.actor_id} (
+            {juno.lastControl.actor_role}) at{" "}
+            {new Date(juno.lastControl.created_at).toLocaleString()}
+            {juno.lastControl.reason ? ` — “${juno.lastControl.reason}”` : ""}
+            {juno.lastControl.incident_id ? " · incident reviewed" : ""}
+          </p>
+        )}
+
         {juno.accessError && (
           <p className="access-notice" role="status">
             <strong>NO PROJECT ACCESS</strong>

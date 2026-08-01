@@ -242,6 +242,40 @@ Returns the **public project view** — never the agent key or its hash:
 While suspended, **both lanes** return `decision: "block"` with
 `reason: "Project suspended"`.
 
+**Resume is accountable.** An owner may resume outright. An **operator** may
+resume only as a reviewed operator — supplying both `reason` and the
+`incident_id` they reviewed — otherwise `403 review_required`. If the project is
+carrying an open high or critical incident, a `reason` of at least 8 characters
+is required from anyone, or `422 reason_required` with the blocking incidents
+listed.
+
+Every suspend and resume appends an immutable row to `control_events`: actor,
+role, credential kind, reason, reviewed incident, previous and next state.
+
+## `GET /v1/projects/control-events`
+
+Who changed this project's state, when, why, and after reviewing what. Needs an
+operator identity with at least the `viewer` role.
+
+```jsonc
+{
+  "events": [
+    {
+      "action": "resume",
+      "previous_status": "suspended",
+      "next_status": "active",
+      "actor_kind": "user",
+      "actor_id": "auth.users uuid",
+      "actor_role": "operator",
+      "actor_email": "op@example.com",
+      "reason": "Reviewed the incident and cleared the dependency",
+      "incident_id": "uuid",
+      "created_at": "2026-08-01T14:31:02Z"
+    }
+  ]
+}
+```
+
 ---
 
 ## Live feed — `GET /v1/events/recent` · `GET /v1/events/stream`

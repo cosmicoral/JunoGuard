@@ -32,6 +32,19 @@ const SPARK_WINDOW_MS = 20_000;
 const SPARK_SAMPLES = 26;
 const SPARK_STEP_MS = 4_000;
 
+/** The last human decision about project state. See supabase/control_events. */
+export interface ControlEvent {
+  action: "suspend" | "resume";
+  previous_status: string;
+  next_status: string;
+  actor_email: string | null;
+  actor_id: string;
+  actor_role: string;
+  reason: string | null;
+  incident_id: string | null;
+  created_at: string;
+}
+
 /** Pause before re-issuing a stream token, so a 401 cannot become a hot loop. */
 const TOKEN_RETRY_MS = 2_000;
 
@@ -115,6 +128,8 @@ export interface JunoState {
   degraded: boolean;
   /** The operator explicitly asked for simulated traffic. */
   simulating: boolean;
+  /** Who last suspended or resumed this project, and why. */
+  lastControl: ControlEvent | null;
   toggleSuspend: () => void;
   enterSimulation: () => void;
 }
@@ -144,6 +159,7 @@ export function useJuno(): JunoState {
   const [feedError, setFeedError] = useState<string | null>(null);
   // Role on the selected project, from project_members. Null until known.
   const [role, setRole] = useState<string | null>(null);
+  const [lastControl, setLastControl] = useState<ControlEvent | null>(null);
   // Set when a configured gateway cannot be reached. The dashboard stays on its
   // real data source and reports the outage — it does not quietly become a
   // simulation, because an operator cannot tell invented traffic from real
@@ -313,6 +329,16 @@ export function useJuno(): JunoState {
         setBlockedCount(ordered.filter((a) => a.decision === "block").length);
       }
       setIncidents((incs as Incident[]) ?? []);
+
+      // Who last changed this project's state, why, and after reviewing what.
+      // Read from the append-only control_events table, scoped by membership.
+      const { data: control } = await supabase
+        .from("control_events")
+        .select("action, previous_status, next_status, actor_email, actor_id, actor_role, reason, incident_id, created_at")
+        .eq("project_id", p.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (!cancelled && control?.[0]) setLastControl(control[0] as ControlEvent);
 
       // Subscribe only once the project is known, and scope every subscription
       // to it. The initial queries were already filtered, but the Realtime
@@ -635,6 +661,7 @@ export function useJuno(): JunoState {
     canControl,
     degraded,
     simulating,
+    lastControl,
     toggleSuspend,
     enterSimulation,
   };

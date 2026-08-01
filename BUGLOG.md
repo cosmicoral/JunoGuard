@@ -39,7 +39,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-012 | P1 | OPEN | Product claims include Modal, SBOM, and unbypassable enforcement that are not implemented |
 | JG-013 | P1 | OPEN | No project-owned automated tests protect security invariants |
 | JG-014 | P2 | FIXED | Provider failures produce no action or audit event |
-| JG-015 | P2 | OPEN | Critical suspend/resume actions lack actor, role, reason, and audit history |
+| JG-015 | P2 | FIXED | Critical suspend/resume actions lack actor, role, reason, and audit history |
 | JG-016 | P2 | OPEN | Production deployment is blocked by localhost-only CORS and missing hosting config |
 | JG-017 | P2 | OPEN | Frontend toolchain has known high/moderate development-server vulnerabilities |
 | JG-018 | P2 | OPEN | Python dependencies are unpinned and builds are not reproducible |
@@ -430,7 +430,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-015 — Critical control actions lack accountable human review
 
 **Priority:** P2 / Medium  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** Resume has no reason payload, and neither suspend nor
 > resume records the human actor, linked incident, previous state, or approval.
