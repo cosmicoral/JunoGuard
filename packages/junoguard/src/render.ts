@@ -172,7 +172,14 @@ export function renderInstall(payload: InstallResult, pkg: string, ecosystem: st
 
   const blocked = decision === "block";
   const style: Style = blocked ? "block" : "flag";
-  const title = blocked ? "JUNO · BLOCKED" : "JUNO · FLAGGED";
+  // "We could not look" is a different message from "we found something": the
+  // agent has to be told to retry, not to go and pick another dependency.
+  const unscanned = payload.review_required === true || verdict.available === false;
+  const title = blocked
+    ? unscanned
+      ? "JUNO · NOT SCANNED"
+      : "JUNO · BLOCKED"
+    : "JUNO · FLAGGED";
 
   const lines = banner(title, `${pkg}  (${ecosystem})`, style, blocked);
   lines.push(blank());
@@ -188,7 +195,19 @@ export function renderInstall(payload: InstallResult, pkg: string, ecosystem: st
   );
 
   lines.push(blank());
-  if (blocked) {
+  if (blocked && unscanned) {
+    const retry = payload.retry_after_seconds;
+    lines.push(text("This package was not installed, and it was never scanned.", style));
+    lines.push(
+      text(
+        retry
+          ? `The scanner is unavailable — retry in ${retry}s, or get an operator review.`
+          : "The scanner is unavailable — retry later, or get an operator review.",
+        style,
+      ),
+    );
+    lines.push(text("This is not a finding against the package.", "dim"));
+  } else if (blocked) {
     // The agent reads this. It has to be unambiguous enough that it picks a
     // different dependency instead of retrying the same one.
     lines.push(text("This package was not installed. Choose a different dependency.", style));

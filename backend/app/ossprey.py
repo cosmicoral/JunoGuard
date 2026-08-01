@@ -12,7 +12,7 @@ import httpx
 
 from . import config
 
-Severity = Literal["malicious", "suspicious", "unknown", "clean"]
+Severity = Literal["malicious", "suspicious", "unknown", "clean", "unavailable"]
 
 SEVERITY_ORDER: dict[str, int] = {
     "clean": 0,
@@ -20,6 +20,12 @@ SEVERITY_ORDER: dict[str, int] = {
     "suspicious": 2,
     "malicious": 3,
 }
+
+# `unknown` is a statement about the package: nobody has established a
+# reputation for it. `unavailable` is a statement about us: the scan did not
+# happen. They are not interchangeable, and an infrastructure failure must never
+# be graded as if it were evidence about the package.
+UNAVAILABLE = "unavailable"
 
 # Ossprey ships this deliberately-flagged package for integration testing.
 CANARY = "@ossprey/test-package"
@@ -34,13 +40,14 @@ def _mock_verdict(package: str) -> dict[str, Any]:
         return {
             "source": "mock",
             "severity": "malicious",
+            "available": True,
             "findings": [
                 "Obfuscated postinstall script",
                 "Outbound POST on install",
                 "Reads process environment at install time",
             ],
         }
-    return {"source": "mock", "severity": "clean", "findings": []}
+    return {"source": "mock", "severity": "clean", "available": True, "findings": []}
 
 
 def _parse(payload: dict[str, Any]) -> dict[str, Any]:
@@ -72,6 +79,7 @@ def _parse(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "source": "ossprey",
         "severity": severity,
+        "available": True,
         "findings": [str(f) for f in findings][:5],
     }
 
@@ -96,13 +104,17 @@ def scan(package: str, ecosystem: str = "npm", version: str | None = None) -> di
         r.raise_for_status()
         verdict = _parse(r.json())
     except Exception as exc:  # noqa: BLE001
-        # Never fail open on a scanner outage, and never hard-fail the agent.
-        # Unknown is the honest answer, and policy decides what to do with it.
+        # An outage is not a verdict. Reporting it as `unknown` let the default
+        # policy treat "we could not look" as "nothing much found" and hand back
+        # a proceedable flag. Say plainly that no scan happened, and never cache
+        # it — the next attempt must go back to the network.
         print(f"[juno] Ossprey scan failed for {package}: {exc}")
         return {
             "source": "ossprey",
-            "severity": "unknown",
-            "findings": ["Scanner unreachable — verdict unavailable"],
+            "severity": UNAVAILABLE,
+            "available": False,
+            "findings": ["Scanner unreachable — no scan was performed"],
+            "error": str(exc),
         }
 
     _cache[key] = verdict

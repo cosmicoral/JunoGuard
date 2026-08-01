@@ -55,7 +55,8 @@ Lane A. Called before a package reaches disk.
 {
   "verdict": {
     "source": "ossprey",       // ossprey | cache | mock
-    "severity": "malicious",   // malicious | suspicious | unknown | clean
+    "severity": "malicious",   // malicious | suspicious | unknown | clean | unavailable
+    "available": true,         // false when no scan happened at all
     "findings": ["Obfuscated postinstall script", "Outbound POST on install"]
   },
   "blast_radius": {
@@ -68,6 +69,20 @@ Lane A. Called before a package reaches disk.
 ```
 
 `blast_radius` is null when the decision is `allow`.
+
+**Scanner unavailable.** `severity: "unknown"` means nobody has established a
+reputation for the package. `severity: "unavailable"` with `available: false`
+means no scan happened — a JunoGuard outage, not a finding. That is never
+gradeable against the policy threshold: the install is refused, and the response
+carries a retry contract rather than a proceedable flag.
+
+```jsonc
+{
+  "decision": "block",
+  "review_required": true,
+  "retry_after_seconds": 60
+}
+```
 
 ---
 

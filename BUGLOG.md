@@ -28,7 +28,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-001 | P0 | FIXED | Authenticated users can read every project, including plaintext agent API keys |
 | JG-002 | P0 | FIXED | Rate and budget enforcement is non-atomic under concurrency |
 | JG-003 | P0 | FIXED | Charged `flag` decisions are excluded from daily spend |
-| JG-004 | P0 | OPEN | Scanner outage produces a proceedable `flag` instead of failing closed |
+| JG-004 | P0 | FIXED | Scanner outage produces a proceedable `flag` instead of failing closed |
 | JG-005 | P1 | OPEN | Event backfill and SSE stream are unauthenticated and global |
 | JG-006 | P1 | OPEN | OAuth does not protect kill-switch operations; the browser ships an agent key |
 | JG-007 | P1 | OPEN | OAuth regression makes the default mock/offline dashboard unreachable |
@@ -160,7 +160,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-004 — Scanner outage fails open to a proceedable flag
 
 **Priority:** P0 / Critical  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** The Ossprey error handler says it never fails open, but it
 > converts an outage into severity `unknown`. Under the default `malicious`

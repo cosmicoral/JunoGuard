@@ -161,10 +161,18 @@ def guard_install(
     # Re-read: a malicious verdict may have just suspended the project.
     status = "suspended" if verdict.suspend else project["status"]
 
-    return _envelope(action_id, verdict, status) | {
+    body = _envelope(action_id, verdict, status) | {
         "verdict": verdict.metadata.get("verdict"),
         "blast_radius": verdict.metadata.get("blast_radius"),
     }
+
+    # A refusal the agent should retry rather than route around says so
+    # structurally, not only in prose it might not parse.
+    if verdict.metadata.get("review_required"):
+        body["review_required"] = True
+        body["retry_after_seconds"] = verdict.metadata.get("retry_after_seconds")
+
+    return body
 
 
 @app.post("/v1/guard/llm")

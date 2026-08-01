@@ -57,7 +57,10 @@ DEFAULT_POLICY = {
     "per_request_budget_usd": _float("PER_REQUEST_BUDGET_USD", 0.05),
     "max_request_tokens": _int("MAX_REQUEST_TOKENS", 4000),
     "max_requests_per_min": _int("BURST_LIMIT_PER_MINUTE", 8),
-    "block_severity": os.getenv("BLOCK_SEVERITY", "malicious"),
+    # A package nobody has established a reputation for is not a package an
+    # agent should install unattended, so `unknown` is the default floor.
+    # Lower it to `malicious` only for a deliberately permissive project.
+    "block_severity": os.getenv("BLOCK_SEVERITY", "unknown"),
     "suspend_on_malware": _bool("SUSPEND_ON_MALWARE", True),
 }
 

@@ -13,7 +13,9 @@ export interface Envelope {
 
 export interface Verdict {
   source?: string; // ossprey | cache | mock
-  severity?: string; // malicious | suspicious | unknown | clean
+  severity?: string; // malicious | suspicious | unknown | clean | unavailable
+  /** False when no scan happened — a scanner outage, not a finding. */
+  available?: boolean;
   findings?: string[];
 }
 
@@ -28,6 +30,9 @@ export interface InstallResult extends Envelope {
   verdict?: Verdict;
   /** Null when the decision is allow. */
   blast_radius?: BlastRadius | null;
+  /** Set when the refusal is "we could not look", not "we found something". */
+  review_required?: boolean;
+  retry_after_seconds?: number;
 }
 
 export interface LlmResult extends Envelope {

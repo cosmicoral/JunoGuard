@@ -35,6 +35,11 @@ SUSPENDED = Verdict(
     risk_level="critical",
 )
 
+# How long a client should wait before re-attempting an install that could not
+# be scanned. Long enough not to hammer a struggling scanner, short enough that
+# a transient blip does not stall a working session.
+SCANNER_RETRY_AFTER_SECONDS = 60
+
 
 # --- Lane A: supply chain ---------------------------------------------------
 
@@ -48,6 +53,29 @@ def evaluate_install(
     verdict = ossprey.scan(package, ecosystem, version)
     severity = verdict["severity"]
     findings = verdict["findings"]
+
+    # No scan happened. That is an infrastructure failure, not evidence about
+    # the package, and it must not be gradeable against a severity threshold —
+    # doing so turned an outage into a proceedable flag that told the agent the
+    # package had been "installed with caution".
+    if not verdict.get("available", True):
+        return Verdict(
+            decision="block",
+            reason=(
+                f"{package} was NOT installed. The supply-chain scanner is "
+                f"unavailable, so no verdict exists for this package. This is a "
+                f"JunoGuard outage, not a finding against {package} — retry once "
+                f"the scanner is reachable, or have an operator record an "
+                f"explicit review."
+            ),
+            risk_level="high",
+            metadata={
+                "verdict": verdict,
+                "blast_radius": None,
+                "review_required": True,
+                "retry_after_seconds": SCANNER_RETRY_AFTER_SECONDS,
+            },
+        )
 
     if severity == "clean":
         return Verdict(
