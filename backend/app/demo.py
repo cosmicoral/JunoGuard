@@ -83,7 +83,7 @@ def seed(project: dict[str, Any], count: int = 28, minutes: int = 45) -> int:
             }
 
         action_id = store.record_action(row)
-        events.publish("action", {**row, "id": action_id})
+        events.publish("action", project["id"], {**row, "id": action_id})
         written += 1
 
     return written

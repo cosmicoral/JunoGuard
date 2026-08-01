@@ -22,19 +22,29 @@ _events: deque[dict[str, Any]] = deque(maxlen=MAX_EVENTS)
 _seq = 0
 
 
-def publish(event_type: str, payload: dict[str, Any]) -> int:
-    """Record an event. Returns its sequence number."""
+def publish(event_type: str, project_id: str, payload: dict[str, Any]) -> int:
+    """Record an event against its project. Returns its sequence number.
+
+    project_id is not optional. Incident evidence carries credential names and
+    blast-radius detail, and a buffer with no owner recorded is a buffer that
+    cannot be filtered — which is how this feed came to serve every project's
+    events to anyone who asked.
+    """
     global _seq
     with _lock:
         _seq += 1
-        _events.append({"seq": _seq, "type": event_type, "data": payload})
+        _events.append(
+            {"seq": _seq, "type": event_type, "project_id": project_id, "data": payload}
+        )
         return _seq
 
 
-def since(cursor: int) -> list[dict[str, Any]]:
-    """Every event after `cursor`, oldest first."""
+def since(cursor: int, project_id: str) -> list[dict[str, Any]]:
+    """Every event after `cursor` belonging to `project_id`, oldest first."""
     with _lock:
-        return [e for e in _events if e["seq"] > cursor]
+        return [
+            e for e in _events if e["seq"] > cursor and e["project_id"] == project_id
+        ]
 
 
 def latest_seq() -> int:
@@ -42,6 +52,7 @@ def latest_seq() -> int:
         return _seq
 
 
-def recent(limit: int = 50) -> list[dict[str, Any]]:
+def recent(limit: int, project_id: str) -> list[dict[str, Any]]:
     with _lock:
-        return list(_events)[-limit:]
+        mine = [e for e in _events if e["project_id"] == project_id]
+    return mine[-limit:]

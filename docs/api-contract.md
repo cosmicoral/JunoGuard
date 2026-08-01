@@ -179,7 +179,25 @@ While suspended, **both lanes** return `decision: "block"` with
 
 The dashboard's **fallback** when Supabase Realtime is not configured. Prefer
 Supabase when `VITE_SUPABASE_URL` is set; use this otherwise, so the demo never
-depends on a credential arriving. No auth — local only.
+depends on a credential arriving.
+
+**Authenticated and project-scoped.** Both endpoints return only the caller's
+own events — incident evidence carries credential names and blast-radius
+detail. Anonymous requests get `401`.
+
+`/v1/events/recent` takes the usual `X-Juno-Key`. `EventSource` cannot send
+headers, so the stream takes a short-lived token instead of the project key —
+a long-lived credential does not belong in a URL that lands in logs, proxies and
+browser history:
+
+```jsonc
+// POST /v1/events/token          (X-Juno-Key)
+{ "token": "…", "expires_in": 300 }
+```
+
+The token authorizes reading one project's feed for that window. When it
+expires the stream emits an `expired` event and closes; the client takes a fresh
+token and reconnects from its last cursor.
 
 Backfill first so the feed is never empty on load:
 
@@ -194,7 +212,7 @@ Backfill first so the feed is never empty on load:
 Then stream from that cursor:
 
 ```
-GET /v1/events/stream?cursor=42        text/event-stream
+GET /v1/events/stream?cursor=42&token=…        text/event-stream
 ```
 
 Three event types. `data` is the JSON payload.
@@ -208,9 +226,15 @@ Three event types. `data` is the JSON payload.
 `metadata.blast_radius` on a blocked install carries the inline expand content.
 
 ```js
-const es = new EventSource("http://localhost:8000/v1/events/stream?cursor=0")
+const { token } = await fetch(`${api}/v1/events/token`, {
+  method: "POST",
+  headers: { "X-Juno-Key": key },
+}).then((r) => r.json())
+
+const es = new EventSource(`${api}/v1/events/stream?cursor=0&token=${token}`)
 es.addEventListener("action",   e => addRow(JSON.parse(e.data)))
 es.addEventListener("project",  e => setStatus(JSON.parse(e.data).status))
+es.addEventListener("expired",  () => reconnectWithFreshToken())
 ```
 
 ---

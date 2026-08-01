@@ -98,6 +98,13 @@ export function Dashboard() {
           </p>
         )}
 
+        {juno.feedError && (
+          <p className="access-notice" role="status">
+            <strong>LIVE FEED NOT AUTHORIZED</strong>
+            {juno.feedError}
+          </p>
+        )}
+
         <Stats
           actions={juno.actions}
           incidents={juno.incidents}

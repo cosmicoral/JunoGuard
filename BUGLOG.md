@@ -29,7 +29,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-002 | P0 | FIXED | Rate and budget enforcement is non-atomic under concurrency |
 | JG-003 | P0 | FIXED | Charged `flag` decisions are excluded from daily spend |
 | JG-004 | P0 | FIXED | Scanner outage produces a proceedable `flag` instead of failing closed |
-| JG-005 | P1 | OPEN | Event backfill and SSE stream are unauthenticated and global |
+| JG-005 | P1 | FIXED | Event backfill and SSE stream are unauthenticated and global |
 | JG-006 | P1 | OPEN | OAuth does not protect kill-switch operations; the browser ships an agent key |
 | JG-007 | P1 | OPEN | OAuth regression makes the default mock/offline dashboard unreachable |
 | JG-008 | P1 | OPEN | A configured live dashboard silently degrades to mock data |
@@ -188,7 +188,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-005 — Event feed leaks global action and incident data
 
 **Priority:** P1 / High  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** `/v1/events/recent` and `/v1/events/stream` require no
 > authentication and the in-process event buffer has no project field filter.

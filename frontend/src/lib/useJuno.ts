@@ -31,6 +31,9 @@ const SPARK_WINDOW_MS = 20_000;
 const SPARK_SAMPLES = 26;
 const SPARK_STEP_MS = 4_000;
 
+/** Pause before re-issuing a stream token, so a 401 cannot become a hot loop. */
+const TOKEN_RETRY_MS = 2_000;
+
 /**
  * Billable spend is any action that cost money, whatever it was labelled.
  * `flag` is proceedable — the provider was called and the charge is real — so
@@ -103,6 +106,7 @@ export interface JunoState {
   freshIds: Set<string>;
   killError: string | null;
   accessError: string | null;
+  feedError: string | null;
   toggleSuspend: () => void;
 }
 
@@ -126,6 +130,9 @@ export function useJuno(): JunoState {
   // Set when the signed-in account has no readable project. Better to say so
   // than to render a dashboard of zeroes that looks like a quiet system.
   const [accessError, setAccessError] = useState<string | null>(null);
+  // Set when the live feed itself cannot be authorized, as distinct from having
+  // no project at all.
+  const [feedError, setFeedError] = useState<string | null>(null);
   // Set when the gateway is configured but unreachable. An empty dashboard is
   // the one outcome the demo cannot survive, so we drop back to mock traffic
   // and say so in the feed badge rather than showing a blank screen.
@@ -331,7 +338,9 @@ export function useJuno(): JunoState {
 
       let cursor = 0;
       try {
-        const recentRes = await fetch(`${apiUrl}/v1/events/recent?limit=50`);
+        const recentRes = await fetch(`${apiUrl}/v1/events/recent?limit=50`, {
+          headers: { "X-Juno-Key": JUNO_KEY },
+        });
         if (recentRes.ok && !cancelled) {
           reached = true;
           const body = (await recentRes.json()) as {
@@ -378,24 +387,63 @@ export function useJuno(): JunoState {
         return;
       }
 
-      es = new EventSource(`${apiUrl}/v1/events/stream?cursor=${cursor}`);
+      // The stream is authenticated by a short-lived token rather than by the
+      // project key: EventSource cannot send headers, and a long-lived key in a
+      // query string ends up in logs, proxies and browser history.
+      const connect = async (): Promise<void> => {
+        if (cancelled) return;
 
-      es.addEventListener("action", (e) => {
-        const data = JSON.parse((e as MessageEvent).data) as Record<string, unknown>;
-        push([actionFromEvent(data, projectIdRef.current)]);
-      });
+        let token: string;
+        try {
+          const res = await fetch(`${apiUrl}/v1/events/token`, {
+            method: "POST",
+            headers: { "X-Juno-Key": JUNO_KEY },
+          });
+          if (!res.ok) {
+            setFeedError(await readError(res));
+            return;
+          }
+          token = ((await res.json()) as { token: string }).token;
+        } catch (err) {
+          setFeedError(err instanceof Error ? err.message : "Event feed unreachable");
+          return;
+        }
+        if (cancelled) return;
+        setFeedError(null);
 
-      es.addEventListener("incident", (e) => {
-        const data = JSON.parse((e as MessageEvent).data) as Record<string, unknown>;
-        pushIncident(incidentFromEvent(data, projectIdRef.current));
-      });
+        es = new EventSource(
+          `${apiUrl}/v1/events/stream?cursor=${cursor}&token=${encodeURIComponent(token)}`,
+        );
 
-      es.addEventListener("project", (e) => {
-        const data = JSON.parse((e as MessageEvent).data) as Record<string, unknown>;
-        const p = projectFromEvent(data);
-        applyProjectStatus(p.status, true);
-        setKillError(null);
-      });
+        es.addEventListener("action", (e) => {
+          const data = JSON.parse((e as MessageEvent).data) as Record<string, unknown>;
+          push([actionFromEvent(data, projectIdRef.current)]);
+        });
+
+        es.addEventListener("incident", (e) => {
+          const data = JSON.parse((e as MessageEvent).data) as Record<string, unknown>;
+          pushIncident(incidentFromEvent(data, projectIdRef.current));
+        });
+
+        es.addEventListener("project", (e) => {
+          const data = JSON.parse((e as MessageEvent).data) as Record<string, unknown>;
+          const p = projectFromEvent(data);
+          applyProjectStatus(p.status, true);
+          setKillError(null);
+        });
+
+        // The token authorizes a window, not a permanent subscription. Take a
+        // fresh one rather than letting EventSource retry a URL that now 401s.
+        const reconnect = () => {
+          es?.close();
+          es = null;
+          if (!cancelled) window.setTimeout(() => void connect(), TOKEN_RETRY_MS);
+        };
+        es.addEventListener("expired", reconnect);
+        es.onerror = reconnect;
+      };
+
+      await connect();
     })();
 
     return () => {
@@ -496,6 +544,7 @@ export function useJuno(): JunoState {
     freshIds: freshIds.current,
     killError,
     accessError,
+    feedError,
     toggleSuspend,
   };
 }

@@ -66,6 +66,13 @@ DEFAULT_POLICY = {
 
 DEMO_PROJECT_KEY = os.getenv("DEMO_PROJECT_KEY", "jg_demo_key_cursorhack2026")
 
+# --- live feed --------------------------------------------------------------
+# Signs the short-lived tokens that authorize an EventSource connection. Unset
+# means a fresh random secret per process, which is safe for a single replica
+# and correctly invalidates every token on restart.
+
+STREAM_TOKEN_SECRET = os.getenv("STREAM_TOKEN_SECRET", "")
+
 
 def mode() -> str:
     """Reported by /health so the demo operator knows what is live."""

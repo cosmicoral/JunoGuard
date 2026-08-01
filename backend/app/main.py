@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import Any, AsyncIterator, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -15,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import config, demo, events, pricing, provider, risk
+from . import config, demo, events, pricing, provider, risk, tokens
 from . import store as store_module
 from .store import public_project, store
 
@@ -90,6 +91,7 @@ def _persist(project: dict[str, Any], verdict: risk.Verdict, **row: Any) -> str:
 
     events.publish(
         "action",
+        project["id"],
         {
             "id": action_id,
             "decision": verdict.decision,
@@ -109,11 +111,15 @@ def _persist(project: dict[str, Any], verdict: risk.Verdict, **row: Any) -> str:
                 **verdict.incident,
             }
         )
-        events.publish("incident", {"action_id": action_id, **verdict.incident})
+        events.publish(
+            "incident", project["id"], {"action_id": action_id, **verdict.incident}
+        )
 
     if verdict.suspend:
         store.set_status(project["id"], "suspended", verdict.reason)
-        events.publish("project", {"status": "suspended", "reason": verdict.reason})
+        events.publish(
+            "project", project["id"], {"status": "suspended", "reason": verdict.reason}
+        )
 
     return action_id
 
@@ -294,7 +300,9 @@ def suspend(
 ) -> dict[str, Any]:
     """The kill switch. Both lanes go dark until this is manually reversed."""
     updated = store.set_status(project["id"], "suspended", payload.reason)
-    events.publish("project", {"status": "suspended", "reason": payload.reason})
+    events.publish(
+        "project", project["id"], {"status": "suspended", "reason": payload.reason}
+    )
     # The persistence row carries the agent key hash. Responses carry the
     # public view of a project and nothing else.
     return public_project(updated)
@@ -303,7 +311,7 @@ def suspend(
 @app.post("/v1/projects/resume")
 def resume(project: dict[str, Any] = Depends(current_project)) -> dict[str, Any]:
     updated = store.set_status(project["id"], "active", None)
-    events.publish("project", {"status": "active", "reason": None})
+    events.publish("project", project["id"], {"status": "active", "reason": None})
     return public_project(updated)
 
 
@@ -318,26 +326,59 @@ def demo_seed(
     return {"seeded": demo.seed(project, count=count)}
 
 
+@app.post("/v1/events/token")
+def events_token(project: dict[str, Any] = Depends(current_project)) -> dict[str, Any]:
+    """Mint a short-lived token for one project's event stream.
+
+    EventSource cannot send headers, and a project key does not belong in a URL:
+    it is long-lived, it authorizes both guarded lanes, and query strings end up
+    in logs and history. This token reads one project's feed and nothing else.
+    """
+    token, ttl = tokens.issue(project["id"])
+    return {"token": token, "expires_in": ttl}
+
+
 @app.get("/v1/events/recent")
-def recent_events(limit: int = 50) -> dict[str, Any]:
-    """Backfill, so the dashboard is never empty on load."""
-    return {"cursor": events.latest_seq(), "events": events.recent(limit)}
+def recent_events(
+    limit: int = 50, project: dict[str, Any] = Depends(current_project)
+) -> dict[str, Any]:
+    """Backfill, so the dashboard is never empty on load. Caller's project only."""
+    return {
+        "cursor": events.latest_seq(),
+        "events": events.recent(limit, project["id"]),
+    }
 
 
 @app.get("/v1/events/stream")
-async def stream_events(cursor: int = 0) -> StreamingResponse:
-    """Server-sent events.
+async def stream_events(cursor: int = 0, token: str = "") -> StreamingResponse:
+    """Server-sent events for one project.
 
-    The dashboard's fallback when Supabase Realtime is not configured, so the
-    demo does not depend on a credential arriving. Pass the cursor from
-    /v1/events/recent to resume without gaps.
+    The dashboard's fallback when Supabase Realtime is not configured. Pass the
+    cursor from /v1/events/recent to resume without gaps, and a token from
+    /v1/events/token to prove which project you may read.
     """
+    verified = tokens.verify(token)
+    if not verified:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": "invalid_stream_token",
+                "detail": "Get a token from POST /v1/events/token.",
+            },
+        )
+    project_id, expires_at = verified
 
     async def generate() -> AsyncIterator[str]:
         last = cursor
         idle = 0
         while True:
-            for event in events.since(last):
+            # The token authorizes a window, not a permanent subscription. The
+            # client re-issues and reconnects.
+            if time.time() >= expires_at:
+                yield "event: expired\ndata: {}\n\n"
+                return
+
+            for event in events.since(last, project_id):
                 last = event["seq"]
                 idle = 0
                 yield f"event: {event['type']}\ndata: {json.dumps(event['data'])}\n\n"

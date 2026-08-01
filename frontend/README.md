@@ -57,7 +57,9 @@ Data source precedence (see `docs/api-contract.md`):
 
 1. **Supabase** — set `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`
 2. **SSE** — set `VITE_API_URL=http://localhost:8000` (backfill
-   `/v1/events/recent`, then `EventSource` on `/v1/events/stream`)
+   `/v1/events/recent`, then a short-lived token from `/v1/events/token` and
+   `EventSource` on `/v1/events/stream`; the feed is authenticated and returns
+   only this project's events)
 3. **Mock** — neither configured
 
 The kill switch POSTs `/v1/projects/suspend` or `/v1/projects/resume` with
