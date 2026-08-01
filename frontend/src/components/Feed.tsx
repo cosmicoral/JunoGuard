@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { clockTime, tokens, usdFine } from "../lib/format";
+import type { DataSource } from "../lib/supabase";
 import type { AgentAction, BlastRadius, Decision } from "../lib/types";
+
+const SOURCE_LABEL: Record<DataSource, string> = {
+  supabase: "SUPABASE REALTIME",
+  sse: "SSE · GATEWAY",
+  mock: "MOCK",
+};
 
 /** Rendering the whole in-memory buffer costs layout work we do not need. */
 const VISIBLE_ROWS = 60;
@@ -34,11 +41,15 @@ function BlastRadiusPanel({ reason, blast }: { reason: string; blast: BlastRadiu
       <div className="blast-grid">
         <div className="blast-key">Credentials in scope</div>
         <div className="blast-val">
-          {blast.credentials.map((c) => (
-            <span className="cred" key={c}>
-              {c}
-            </span>
-          ))}
+          {blast.credentials.length > 0 ? (
+            blast.credentials.map((c) => (
+              <span className="cred" key={c}>
+                {c}
+              </span>
+            ))
+          ) : (
+            <span className="cred-none">none reachable from this environment</span>
+          )}
         </div>
         <div className="blast-key">Network egress</div>
         <div className="blast-val">{blast.network_egress}</div>
@@ -162,11 +173,11 @@ function Row({
 export function Feed({
   actions,
   freshIds,
-  live,
+  source,
 }: {
   actions: AgentAction[];
   freshIds: Set<string>;
-  live: boolean;
+  source: DataSource;
 }) {
   const reduce = useReducedMotion() ?? false;
   // Only holds explicit user overrides. The default is derived, so a blocked
@@ -180,7 +191,7 @@ export function Feed({
     <section className="panel feed">
       <div className="feed-head">
         <span className="feed-title">Live</span>
-        <span className="feed-mode">{live ? "SUPABASE REALTIME" : "MOCK"}</span>
+        <span className="feed-mode">{SOURCE_LABEL[source]}</span>
         <span className="feed-count">both lanes · newest first</span>
       </div>
       <ul className="feed-list">

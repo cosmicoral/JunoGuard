@@ -15,11 +15,13 @@ export function Header({
   projectName,
   suspended,
   actionsToday,
+  killError,
   onToggleSuspend,
 }: {
   projectName: string;
   suspended: boolean;
   actionsToday: number;
+  killError: string | null;
   onToggleSuspend: () => void;
 }) {
   return (
@@ -44,9 +46,15 @@ export function Header({
 
       <div className="spacer" />
 
-      <span className="uptime">
-        {actionsToday.toLocaleString("en-US")} actions gated today
-      </span>
+      {killError ? (
+        <span className="kill-error" role="alert" title={killError}>
+          {killError}
+        </span>
+      ) : (
+        <span className="uptime">
+          {actionsToday.toLocaleString("en-US")} actions gated today
+        </span>
+      )}
 
       <button
         className="kill"

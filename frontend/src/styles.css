@@ -214,6 +214,17 @@ body[data-suspended="true"] {
   letter-spacing: 0.04em;
 }
 
+.kill-error {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--block);
+  letter-spacing: 0.02em;
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Kill switch ------------------------------------------------------------- */
 
 .kill {
@@ -622,6 +633,11 @@ body[data-suspended="true"] {
   padding: 1px 6px;
   margin: 0 5px 4px 0;
   font-size: 11.5px;
+}
+
+.cred-none {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .blast-summary {

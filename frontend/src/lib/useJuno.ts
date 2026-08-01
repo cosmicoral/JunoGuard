@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiUrl, isLive, supabase } from "./supabase";
+import { actionFromEvent, incidentFromEvent, projectFromEvent } from "./events";
+import { apiUrl, dataSource, isLive, JUNO_KEY, supabase } from "./supabase";
 import type { AgentAction, Incident, Policy, Project } from "./types";
 import {
   ACTIONS_EARLIER_TODAY,
@@ -64,6 +65,20 @@ function ratePerMinute(actions: AgentAction[], now: number): number {
   );
 }
 
+async function readError(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { detail?: string | { detail?: string }; error?: string };
+    if (typeof body.detail === "string") return body.detail;
+    if (body.detail && typeof body.detail === "object" && body.detail.detail) {
+      return body.detail.detail;
+    }
+    if (body.error) return body.error;
+  } catch {
+    /* fall through */
+  }
+  return `Request failed (${res.status})`;
+}
+
 export interface JunoState {
   project: Project;
   policy: Policy;
@@ -78,22 +93,34 @@ export interface JunoState {
   suspended: boolean;
   suspendedAt: number | null;
   live: boolean;
+  source: typeof dataSource;
   freshIds: Set<string>;
+  killError: string | null;
   toggleSuspend: () => void;
 }
 
 export function useJuno(): JunoState {
   const [seed] = useState(() => {
+    if (dataSource !== "mock") return { actions: [] as AgentAction[], incidents: [] as Incident[] };
     const a = seedActions();
     return { actions: a, incidents: seedIncidents(a) };
   });
   const [project, setProject] = useState<Project>(MOCK_PROJECT);
-  const [policy] = useState<Policy>(MOCK_POLICY);
+  // Adopted from /v1/guard/status in SSE mode — the sparkline's cap line has to
+  // be the limit the gateway actually enforces, not the mock's.
+  const [policy, setPolicy] = useState<Policy>(MOCK_POLICY);
   const [actions, setActions] = useState<AgentAction[]>(seed.actions);
   const [incidents, setIncidents] = useState<Incident[]>(seed.incidents);
   const [rate, setRate] = useState<number[]>([]);
   const [reqPerMin, setReqPerMin] = useState(0);
   const [suspendedAt, setSuspendedAt] = useState<number | null>(null);
+  const [killError, setKillError] = useState<string | null>(null);
+  const [killing, setKilling] = useState(false);
+  // Set when the gateway is configured but unreachable. An empty dashboard is
+  // the one outcome the demo cannot survive, so we drop back to mock traffic
+  // and say so in the feed badge rather than showing a blank screen.
+  const [gatewayDown, setGatewayDown] = useState(false);
+  const source: typeof dataSource = gatewayDown ? "mock" : dataSource;
 
   // Rollups accumulate. Deriving them from the visible buffer would make both
   // figures fall as old rows are trimmed off the end, which is worse than
@@ -107,27 +134,45 @@ export function useJuno(): JunoState {
 
   // Rows seeded on load must not animate in; only what arrives after does.
   const freshIds = useRef<Set<string>>(new Set());
+  const seenIds = useRef<Set<string>>(new Set(seed.actions.map((a) => a.id)));
+  const projectIdRef = useRef(MOCK_PROJECT.id);
 
   const suspended = project.status === "suspended";
   const suspendedRef = useRef(suspended);
   suspendedRef.current = suspended;
 
-  const push = useCallback((incoming: AgentAction[]) => {
+  const applyProjectStatus = useCallback((status: Project["status"], markTime: boolean) => {
+    setProject((prev) => (prev.status === status ? prev : { ...prev, status }));
+    if (status === "suspended" && markTime) setSuspendedAt(Date.now());
+    if (status === "active") setSuspendedAt(null);
+  }, []);
+
+  const push = useCallback((incoming: AgentAction[], opts?: { fresh?: boolean }) => {
     if (incoming.length === 0) return;
-    for (const a of incoming) freshIds.current.add(a.id);
-    setSpendToday((prev) => prev + sumAllowedCost(incoming));
-    setBlockedCount((prev) => prev + incoming.filter((a) => a.decision === "block").length);
+    const fresh = opts?.fresh !== false;
+    const novel = incoming.filter((a) => !seenIds.current.has(a.id));
+    if (novel.length === 0) return;
+    for (const a of novel) {
+      seenIds.current.add(a.id);
+      if (fresh) freshIds.current.add(a.id);
+    }
+    setSpendToday((prev) => prev + sumAllowedCost(novel));
+    setBlockedCount((prev) => prev + novel.filter((a) => a.decision === "block").length);
     setActions((prev) => {
-      const merged = [...prev, ...incoming].sort(
+      const merged = [...prev, ...novel].sort(
         (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at),
       );
       return merged.slice(-MAX_ROWS);
     });
   }, []);
 
+  const pushIncident = useCallback((inc: Incident) => {
+    setIncidents((prev) => [inc, ...prev.filter((i) => i.id !== inc.id)]);
+  }, []);
+
   // ---- mock mode -----------------------------------------------------------
   useEffect(() => {
-    if (isLive) return;
+    if (source !== "mock") return;
     let timer: number;
     const tick = () => {
       push([suspendedRef.current ? suspendedAction() : nextAction()]);
@@ -135,11 +180,11 @@ export function useJuno(): JunoState {
     };
     timer = window.setTimeout(tick, nextDelay());
     return () => window.clearTimeout(timer);
-  }, [push]);
+  }, [push, source]);
 
-  // ---- live mode -----------------------------------------------------------
+  // ---- supabase mode -------------------------------------------------------
   useEffect(() => {
-    if (!isLive || !supabase) return;
+    if (dataSource !== "supabase" || !supabase) return;
     const db = supabase;
     let cancelled = false;
 
@@ -152,6 +197,7 @@ export function useJuno(): JunoState {
       const p = projects?.[0] as Project | undefined;
       if (!p || cancelled) return;
       setProject(p);
+      projectIdRef.current = p.id;
 
       const [{ data: rows }, { data: incs }] = await Promise.all([
         supabase
@@ -163,7 +209,13 @@ export function useJuno(): JunoState {
         supabase.from("incidents").select("*").eq("project_id", p.id).eq("status", "open"),
       ]);
       if (cancelled) return;
-      if (rows) setActions((rows as AgentAction[]).slice().reverse());
+      if (rows) {
+        const ordered = (rows as AgentAction[]).slice().reverse();
+        for (const a of ordered) seenIds.current.add(a.id);
+        setActions(ordered);
+        setSpendToday(sumAllowedCost(ordered));
+        setBlockedCount(ordered.filter((a) => a.decision === "block").length);
+      }
       setIncidents((incs as Incident[]) ?? []);
     })();
 
@@ -189,6 +241,7 @@ export function useJuno(): JunoState {
           const row = payload.new as Project;
           setProject((prev) => (prev.id === row.id ? { ...prev, ...row } : prev));
           if (row.status === "suspended") setSuspendedAt(Date.now());
+          if (row.status === "active") setSuspendedAt(null);
         },
       )
       .subscribe();
@@ -198,6 +251,123 @@ export function useJuno(): JunoState {
       db.removeChannel(channel);
     };
   }, [push]);
+
+  // ---- SSE mode (gateway fallback when Supabase is not configured) ---------
+  useEffect(() => {
+    if (dataSource !== "sse" || !apiUrl) return;
+    let cancelled = false;
+    let es: EventSource | null = null;
+    let reached = false;
+
+    (async () => {
+      try {
+        const statusRes = await fetch(`${apiUrl}/v1/guard/status`, {
+          headers: { "X-Juno-Key": JUNO_KEY },
+        });
+        if (statusRes.ok && !cancelled) {
+          reached = true;
+          const status = (await statusRes.json()) as {
+            project?: string;
+            status?: string;
+            spend_today_usd?: number;
+            blocked_today?: number;
+            daily_budget_usd?: number;
+            max_requests_per_min?: number;
+          };
+          setProject((prev) => ({
+            ...prev,
+            name: status.project ?? prev.name,
+            status: status.status === "suspended" ? "suspended" : "active",
+          }));
+          if (status.status === "suspended") setSuspendedAt(Date.now());
+          if (typeof status.spend_today_usd === "number") setSpendToday(status.spend_today_usd);
+          if (typeof status.blocked_today === "number") setBlockedCount(status.blocked_today);
+          setPolicy((prev) => ({
+            ...prev,
+            daily_budget_usd: status.daily_budget_usd ?? prev.daily_budget_usd,
+            max_requests_per_min: status.max_requests_per_min ?? prev.max_requests_per_min,
+          }));
+        }
+      } catch {
+        /* status is best-effort; the feed still works */
+      }
+
+      if (cancelled) return;
+
+      let cursor = 0;
+      try {
+        const recentRes = await fetch(`${apiUrl}/v1/events/recent?limit=50`);
+        if (recentRes.ok && !cancelled) {
+          reached = true;
+          const body = (await recentRes.json()) as {
+            cursor: number;
+            events: { seq: number; type: string; data: Record<string, unknown> }[];
+          };
+          cursor = body.cursor ?? 0;
+          const pid = projectIdRef.current;
+          const backfillActions: AgentAction[] = [];
+          const backfillIncidents: Incident[] = [];
+          for (const ev of body.events ?? []) {
+            if (ev.type === "action") {
+              backfillActions.push(actionFromEvent(ev.data, pid));
+            } else if (ev.type === "incident") {
+              backfillIncidents.push(incidentFromEvent(ev.data, pid));
+            } else if (ev.type === "project") {
+              const p = projectFromEvent(ev.data);
+              applyProjectStatus(p.status, p.status === "suspended");
+            }
+          }
+          // History only — no enter animation, and don't re-accumulate rollups
+          // that /v1/guard/status already seeded.
+          for (const a of backfillActions) seenIds.current.add(a.id);
+          setActions(backfillActions.slice(-MAX_ROWS));
+          setIncidents(backfillIncidents.reverse());
+        }
+      } catch {
+        /* handled by the reachability check below */
+      }
+
+      if (cancelled) return;
+
+      // Gateway configured but not answering — usually uvicorn is not running,
+      // or CORS rejected the origin. Fall back to mock rather than show nothing.
+      if (!reached) {
+        const fallback = seedActions();
+        for (const a of fallback) seenIds.current.add(a.id);
+        setActions(fallback);
+        setIncidents(seedIncidents(fallback));
+        setSpendToday(SPEND_EARLIER_TODAY + sumAllowedCost(fallback));
+        setBlockedCount(fallback.filter((a) => a.decision === "block").length);
+        setPolicy(MOCK_POLICY);
+        setGatewayDown(true);
+        return;
+      }
+
+      es = new EventSource(`${apiUrl}/v1/events/stream?cursor=${cursor}`);
+
+      es.addEventListener("action", (e) => {
+        const data = JSON.parse((e as MessageEvent).data) as Record<string, unknown>;
+        push([actionFromEvent(data, projectIdRef.current)]);
+      });
+
+      es.addEventListener("incident", (e) => {
+        const data = JSON.parse((e as MessageEvent).data) as Record<string, unknown>;
+        pushIncident(incidentFromEvent(data, projectIdRef.current));
+      });
+
+      es.addEventListener("project", (e) => {
+        const data = JSON.parse((e as MessageEvent).data) as Record<string, unknown>;
+        const p = projectFromEvent(data);
+        applyProjectStatus(p.status, true);
+        setKillError(null);
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      es?.close();
+    };
+  }, [push, pushIncident, applyProjectStatus]);
 
   // ---- rolling rate --------------------------------------------------------
   useEffect(() => {
@@ -213,7 +383,7 @@ export function useJuno(): JunoState {
 
   // ---- demo controls (invisible; safe on stage) ----------------------------
   useEffect(() => {
-    if (isLive) return;
+    if (source !== "mock") return;
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "b" || e.key === "B") {
@@ -225,19 +395,53 @@ export function useJuno(): JunoState {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [push]);
+  }, [push, source]);
 
   const toggleSuspend = useCallback(() => {
+    if (killing) return;
     const next = suspendedRef.current ? "active" : "suspended";
-    setProject((prev) => ({ ...prev, status: next }));
-    setSuspendedAt(next === "suspended" ? Date.now() : null);
-    if (apiUrl) {
-      // Best effort. The dashboard never waits on the network to change state.
-      void fetch(`${apiUrl}/projects/${project.id}/${next === "suspended" ? "suspend" : "resume"}`, {
-        method: "POST",
-      }).catch(() => {});
+    const path = next === "suspended" ? "suspend" : "resume";
+
+    // Pure mock: flip locally. No gateway to disagree with us.
+    if (!apiUrl) {
+      applyProjectStatus(next, next === "suspended");
+      setKillError(null);
+      return;
     }
-  }, [project.id]);
+
+    // Live gateway: wait for the POST. Optimistic UI here is how we got a
+    // dashboard that said suspended while traffic kept flowing.
+    setKilling(true);
+    setKillError(null);
+
+    void (async () => {
+      try {
+        const res = await fetch(`${apiUrl}/v1/projects/${path}`, {
+          method: "POST",
+          headers: {
+            "X-Juno-Key": JUNO_KEY,
+            ...(next === "suspended" ? { "Content-Type": "application/json" } : {}),
+          },
+          body:
+            next === "suspended"
+              ? JSON.stringify({ reason: "Manual suspend from dashboard" })
+              : undefined,
+        });
+        if (!res.ok) {
+          setKillError(await readError(res));
+          return;
+        }
+        const updated = (await res.json()) as { status?: string };
+        const status = updated.status === "suspended" ? "suspended" : "active";
+        applyProjectStatus(status, status === "suspended");
+        setKillError(null);
+      } catch (err) {
+        setKillError(err instanceof Error ? err.message : "Kill switch unreachable");
+      } finally {
+        setKilling(false);
+      }
+    })();
+  }, [apiUrl, applyProjectStatus, killing]);
 
   return {
     project,
@@ -252,8 +456,10 @@ export function useJuno(): JunoState {
     actionsToday: (isLive ? 0 : ACTIONS_EARLIER_TODAY) + actions.length,
     suspended,
     suspendedAt,
-    live: isLive,
+    live: source !== "mock",
+    source,
     freshIds: freshIds.current,
+    killError,
     toggleSuspend,
   };
 }

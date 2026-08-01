@@ -12,21 +12,20 @@ Runs with **mock data out of the box** — no backend, no Supabase, no keys.
 
 ## Mock mode vs live
 
-Mock mode is the default and is what the demo runs on. It seeds ~55 rows of
-plausible history so the feed is never empty, then emits new actions on a
-timer at roughly 22–25 req/min against a 30/min policy cap.
+Mock mode is the default. It seeds ~55 rows of plausible history so the feed
+is never empty, then emits new actions on a timer at roughly 22–25 req/min
+against a 30/min policy cap.
 
-Set both of these and the dashboard switches to Supabase Realtime instead —
-`agent_actions` and `incidents` inserts, `projects` updates, no polling:
+Data source precedence (see `docs/api-contract.md`):
 
-```
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
-```
+1. **Supabase** — set `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`
+2. **SSE** — set `VITE_API_URL=http://localhost:8000` (backfill
+   `/v1/events/recent`, then `EventSource` on `/v1/events/stream`)
+3. **Mock** — neither configured
 
-Optional: `VITE_API_URL` makes the kill switch also POST
-`/projects/:id/suspend` (or `/resume`) to the gateway. The UI never waits on
-that request — the screen flips immediately either way.
+The kill switch POSTs `/v1/projects/suspend` or `/v1/projects/resume` with
+`X-Juno-Key`. Failures surface in the header — the UI does not flip until the
+gateway confirms.
 
 ## Demo controls
 

@@ -47,6 +47,7 @@ export default function App() {
           projectName={juno.project.name}
           suspended={juno.suspended}
           actionsToday={juno.actionsToday}
+          killError={juno.killError}
           onToggleSuspend={juno.toggleSuspend}
         />
 
@@ -61,7 +62,7 @@ export default function App() {
           rate={juno.rate}
         />
 
-        <Feed actions={juno.actions} freshIds={juno.freshIds} live={juno.live} />
+        <Feed actions={juno.actions} freshIds={juno.freshIds} source={juno.source} />
       </div>
     </>
   );

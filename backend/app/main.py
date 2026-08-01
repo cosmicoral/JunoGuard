@@ -22,7 +22,10 @@ app = FastAPI(title="JunoGuard API", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    # Any localhost port, not just 5173. Vite silently moves to 5174+ when the
+    # default is taken, and a CORS rejection there is invisible in the UI — it
+    # just renders an empty dashboard, which is the one thing the demo cannot do.
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
