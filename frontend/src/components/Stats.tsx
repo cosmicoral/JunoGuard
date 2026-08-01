@@ -1,53 +1,10 @@
+import type { ReactNode } from "react";
 import { motion } from "motion/react";
 import { AnimatedNumber } from "./AnimatedNumber";
 import { count, integer, usd } from "../lib/format";
-import type { AgentAction, Incident, Policy } from "../lib/types";
+import type { AgentAction, Policy } from "../lib/types";
 
 type Tone = "default" | "allow" | "flag" | "block" | "muted";
-
-/**
- * One sparkline in the whole dashboard, and it is here: the burst spike is
- * the entire Lane B argument in a single glyph. Bars over a line — at
- * projector distance a 2px stroke disappears and a bar does not.
- */
-function Sparkline({ series, limit }: { series: number[]; limit: number }) {
-  const n = Math.max(series.length, 1);
-  const barW = 4;
-  const gap = 2.5;
-  const width = n * (barW + gap) - gap;
-  const height = 30;
-  const peak = Math.max(...series, limit * 1.4, 1);
-  const limitY = height - (limit / peak) * height;
-
-  return (
-    <svg
-      className="spark"
-      viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="none"
-      aria-hidden="true"
-    >
-      <line className="spark-limit" x1="0" y1={limitY} x2={width} y2={limitY} />
-      {series.map((v, i) => {
-        const h = Math.max((v / peak) * height, 1);
-        const over = v > limit;
-        const near = !over && v > limit * 0.8;
-        return (
-          <rect
-            key={i}
-            className="spark-bar"
-            x={i * (barW + gap)}
-            y={height - h}
-            width={barW}
-            height={h}
-            rx={0.75}
-            fill={over ? "var(--block)" : near ? "var(--flag)" : "var(--allow)"}
-            opacity={over ? 1 : near ? 0.9 : 0.62}
-          />
-        );
-      })}
-    </svg>
-  );
-}
 
 function Meter({ ratio, tone }: { ratio: number; tone: Tone }) {
   return (
@@ -69,6 +26,8 @@ function Tile({
   format,
   unit,
   tone = "default",
+  chip,
+  chipTone = "allow",
   children,
 }: {
   label: string;
@@ -76,11 +35,20 @@ function Tile({
   format: (n: number) => string;
   unit?: string;
   tone?: Tone;
-  children?: React.ReactNode;
+  chip?: string;
+  chipTone?: Tone;
+  children?: ReactNode;
 }) {
   return (
-    <div className="panel tile">
-      <div className="tile-label">{label}</div>
+    <div className="panel tile kpi-card">
+      <div className="tile-topline">
+        <div className="tile-label">{label}</div>
+        {chip && (
+          <span className="trend-chip" data-tone={chipTone}>
+            {chip}
+          </span>
+        )}
+      </div>
       <div className="tile-value" data-tone={tone}>
         <AnimatedNumber value={value} format={format} />
         {unit && <span className="tile-unit">{unit}</span>}
@@ -92,37 +60,27 @@ function Tile({
 
 export function Stats({
   actions,
-  incidents,
   policy,
   spendToday,
   blockedCount,
-  openIncidents,
   reqPerMin,
-  rate,
+  actionsToday,
 }: {
   actions: AgentAction[];
-  incidents: Incident[];
   policy: Policy;
   spendToday: number;
   blockedCount: number;
-  openIncidents: number;
   reqPerMin: number;
-  rate: number[];
+  actionsToday: number;
 }) {
-  const budgetRatio = spendToday / policy.daily_budget_usd;
+  const budgetRatio = policy.daily_budget_usd > 0 ? spendToday / policy.daily_budget_usd : 0;
   const spendTone: Tone = budgetRatio >= 1 ? "block" : budgetRatio > 0.75 ? "flag" : "allow";
+  const healthLabel =
+    budgetRatio >= 1 ? "cap reached" : budgetRatio > 0.75 ? "budget watch" : "gate healthy";
 
   const blocks = actions.filter((a) => a.decision === "block");
-  const supplyBlocks = blocks.filter((a) => a.action_type === "package_install").length;
-  const tokenBlocks = blocks.length - supplyBlocks;
-
-  const worst = incidents
-    .filter((i) => i.status === "open")
-    .some((i) => i.severity === "critical")
-    ? "critical"
-    : openIncidents > 0
-      ? "high"
-      : "clear";
+  const packageBlocks = blocks.filter((a) => a.action_type === "package_install").length;
+  const llmBlocks = blocks.length - packageBlocks;
 
   const rateTone: Tone =
     reqPerMin > policy.max_requests_per_min
@@ -133,9 +91,18 @@ export function Stats({
 
   return (
     <div className="stats">
-      <Tile label="Spend today" value={spendToday} format={usd} tone="default">
+      <Tile
+        label="Spend today"
+        value={spendToday}
+        format={usd}
+        chip={healthLabel}
+        chipTone={spendTone}
+      >
         <Meter ratio={budgetRatio} tone={spendTone} />
-        <div className="tile-foot">of {usd(policy.daily_budget_usd)} daily cap</div>
+        <div className="tile-foot">
+          {Math.round(Math.min(budgetRatio, 1) * 100)}% of {usd(policy.daily_budget_usd)} daily
+          budget
+        </div>
       </Tile>
 
       <Tile
@@ -145,25 +112,22 @@ export function Stats({
         tone={blockedCount > 0 ? "block" : "muted"}
       >
         <div className="tile-foot">
-          {supplyBlocks} supply chain · {tokenBlocks} tokens
+          {packageBlocks} package · {llmBlocks} LLM decisions
         </div>
       </Tile>
 
       <Tile
-        label="Incidents"
-        value={openIncidents}
+        label="Actions gated"
+        value={actionsToday}
         format={integer}
-        unit="open"
-        tone={openIncidents > 0 ? "flag" : "muted"}
+        unit="total"
+        tone={rateTone}
       >
-        <div className="tile-foot">
-          {worst === "clear" ? "no active findings" : `severity: ${worst}`}
+        <div className="kpi-split">
+          <span>{count(reqPerMin)}</span>
+          <small>req / min</small>
         </div>
-      </Tile>
-
-      <Tile label="Req / min" value={reqPerMin} format={count} tone={rateTone}>
-        <Sparkline series={rate} limit={policy.max_requests_per_min} />
-        <div className="tile-foot">last 2 min · cap {policy.max_requests_per_min}/min</div>
+        <div className="tile-foot">last minute · cap {policy.max_requests_per_min}/min</div>
       </Tile>
     </div>
   );
