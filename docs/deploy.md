@@ -56,6 +56,15 @@ is setting `key_revoked_at`; the gateway stops matching it immediately.
 
 ## 2. Gateway
 
+Supported Python is **3.12** (see `.python-version`). Backend dependencies are a
+hashed lock in `backend/requirements.txt` (source: `requirements.in`). The
+image installs with `pip install --require-hashes`; a local install should too:
+
+```bash
+python3.12 -m venv .venv && . .venv/bin/activate
+pip install --require-hashes -r backend/requirements.txt
+```
+
 ```bash
 docker build -t junoguard-gateway ./backend
 docker run -p 8000:8000 --env-file ./backend/.env.production junoguard-gateway
