@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import config, demo, events, pricing, provider, risk, tokens
+from . import auth, config, demo, events, pricing, provider, risk, tokens
 from . import store as store_module
 from .store import public_project, store
 
@@ -38,6 +38,7 @@ app.add_middleware(
 
 
 def current_project(x_juno_key: str = Header(default="")) -> dict[str, Any]:
+    """Agent authentication. Guarded lanes only — never the control plane."""
     project = store.get_project(x_juno_key) if x_juno_key else None
     if not project:
         raise HTTPException(
@@ -48,6 +49,46 @@ def current_project(x_juno_key: str = Header(default="")) -> dict[str, Any]:
             },
         )
     return project
+
+
+def controlled_project(
+    project_id: str | None,
+    authorization: str,
+    operator_token: str,
+    minimum_role: str,
+    action: str,
+) -> tuple[dict[str, Any], auth.Actor]:
+    """Resolve a human-control request to (project, accountable actor).
+
+    Deliberately takes no agent key. Suspend and resume are human decisions, and
+    a credential that lives in agent configs and CI environments is not a person.
+    """
+    target = project_id or store.sole_project_id()
+    if not target:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "project_id_required",
+                "detail": "Name the project to act on.",
+            },
+        )
+
+    try:
+        actor = auth.resolve_actor(target, authorization, operator_token)
+        auth.require(actor, minimum_role, action)
+    except auth.AuthError as exc:
+        raise HTTPException(
+            status_code=exc.status,
+            detail={"error": exc.error, "detail": exc.detail},
+        ) from exc
+
+    project = store.get_project_by_id(target)
+    if not project:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "unknown_project", "detail": "No such project."},
+        )
+    return project, actor
 
 
 # --- schemas ----------------------------------------------------------------
@@ -67,6 +108,13 @@ class LLMRequest(BaseModel):
 
 class SuspendRequest(BaseModel):
     reason: str = "Manual suspend from dashboard"
+    # Which project to act on. Optional only where the deployment holds exactly
+    # one — a local memory-store run.
+    project_id: str | None = None
+
+
+class ResumeRequest(BaseModel):
+    project_id: str | None = None
 
 
 # --- helpers ----------------------------------------------------------------
@@ -296,23 +344,46 @@ def guard_status(project: dict[str, Any] = Depends(current_project)) -> dict[str
 
 @app.post("/v1/projects/suspend")
 def suspend(
-    payload: SuspendRequest, project: dict[str, Any] = Depends(current_project)
+    payload: SuspendRequest,
+    authorization: str = Header(default=""),
+    x_juno_operator: str = Header(default=""),
 ) -> dict[str, Any]:
-    """The kill switch. Both lanes go dark until this is manually reversed."""
+    """The kill switch. Both lanes go dark until a human reverses it.
+
+    Operator or owner. An agent key gets 401 here no matter how valid it is.
+    """
+    project, actor = controlled_project(
+        payload.project_id, authorization, x_juno_operator, "operator", "Suspending a project"
+    )
     updated = store.set_status(project["id"], "suspended", payload.reason)
     events.publish(
-        "project", project["id"], {"status": "suspended", "reason": payload.reason}
+        "project",
+        project["id"],
+        {"status": "suspended", "reason": payload.reason} | actor.audit(),
     )
     # The persistence row carries the agent key hash. Responses carry the
     # public view of a project and nothing else.
-    return public_project(updated)
+    return public_project(updated) | {"actor": actor.audit()}
 
 
 @app.post("/v1/projects/resume")
-def resume(project: dict[str, Any] = Depends(current_project)) -> dict[str, Any]:
+def resume(
+    payload: ResumeRequest = ResumeRequest(),
+    authorization: str = Header(default=""),
+    x_juno_operator: str = Header(default=""),
+) -> dict[str, Any]:
+    """Bringing a project back is the higher bar of the two: owner only.
+
+    Stopping something should be easy and reversing it should be deliberate.
+    """
+    project, actor = controlled_project(
+        payload.project_id, authorization, x_juno_operator, "owner", "Resuming a project"
+    )
     updated = store.set_status(project["id"], "active", None)
-    events.publish("project", project["id"], {"status": "active", "reason": None})
-    return public_project(updated)
+    events.publish(
+        "project", project["id"], {"status": "active", "reason": None} | actor.audit()
+    )
+    return public_project(updated) | {"actor": actor.audit()}
 
 
 # --- live feed --------------------------------------------------------------

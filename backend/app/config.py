@@ -73,6 +73,14 @@ DEMO_PROJECT_KEY = os.getenv("DEMO_PROJECT_KEY", "jg_demo_key_cursorhack2026")
 
 STREAM_TOKEN_SECRET = os.getenv("STREAM_TOKEN_SECRET", "")
 
+# --- human control plane ----------------------------------------------------
+# Suspend and resume need an accountable operator, never an agent key. With
+# Supabase configured that is a signed-in user holding a role on the project.
+# For a local deployment with no Supabase, set OPERATOR_TOKEN and send it as
+# X-Juno-Operator. Unset means the only way in is a real session.
+
+OPERATOR_TOKEN = os.getenv("OPERATOR_TOKEN", "")
+
 
 def mode() -> str:
     """Reported by /health so the demo operator knows what is live."""

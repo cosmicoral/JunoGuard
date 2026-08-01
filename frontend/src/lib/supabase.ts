@@ -33,5 +33,21 @@ export const supabase: SupabaseClient | null =
       })
     : null;
 
-/** Demo project key from the frozen API contract. */
-export const JUNO_KEY = "jg_demo_key_cursorhack2026";
+/**
+ * Agent key for the local SSE lane, read from the environment — never baked in.
+ *
+ * A key compiled into the bundle is a published credential: anyone who loaded
+ * the page could replay it against the gateway. It is also the wrong kind of
+ * credential for a browser to hold at all, which is why it authorizes only the
+ * read-only feed here and nothing on the control plane.
+ */
+export const JUNO_KEY = (import.meta.env.VITE_JUNO_KEY as string | undefined) ?? "";
+
+/**
+ * Operator credential for the local lane's kill switch, for deployments with no
+ * Supabase to sign into. Suspend and resume refuse agent keys outright, so
+ * without this the kill switch is correctly unavailable rather than quietly
+ * falling back to something weaker.
+ */
+export const OPERATOR_TOKEN =
+  (import.meta.env.VITE_JUNO_OPERATOR_TOKEN as string | undefined) ?? "";

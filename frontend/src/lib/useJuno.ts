@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { actionFromEvent, incidentFromEvent, projectFromEvent } from "./events";
-import { apiUrl, dataSource, isLive, JUNO_KEY, supabase } from "./supabase";
+import { apiUrl, dataSource, isLive, JUNO_KEY, OPERATOR_TOKEN, supabase } from "./supabase";
 import type { AgentAction, Incident, Policy, Project } from "./types";
 import {
   ACTIONS_EARLIER_TODAY,
@@ -107,6 +107,9 @@ export interface JunoState {
   killError: string | null;
   accessError: string | null;
   feedError: string | null;
+  role: string | null;
+  /** False when this operator may not change project state. */
+  canControl: boolean;
   toggleSuspend: () => void;
 }
 
@@ -133,6 +136,8 @@ export function useJuno(): JunoState {
   // Set when the live feed itself cannot be authorized, as distinct from having
   // no project at all.
   const [feedError, setFeedError] = useState<string | null>(null);
+  // Role on the selected project, from project_members. Null until known.
+  const [role, setRole] = useState<string | null>(null);
   // Set when the gateway is configured but unreachable. An empty dashboard is
   // the one outcome the demo cannot survive, so we drop back to mock traffic
   // and say so in the feed badge rather than showing a blank screen.
@@ -157,6 +162,20 @@ export function useJuno(): JunoState {
   const suspended = project.status === "suspended";
   const suspendedRef = useRef(suspended);
   suspendedRef.current = suspended;
+
+  /**
+   * Whether this operator can change project state at all. The gateway is the
+   * authority — it re-checks the role on every call — but showing a live button
+   * that is guaranteed to 403 is its own kind of lie. Resume is owner-only, so
+   * an operator loses the control once the project is suspended.
+   */
+  const canControl = !apiUrl
+    ? true // pure mock: the toggle is local and affects nothing real
+    : supabase
+      ? suspended
+        ? role === "owner"
+        : role === "operator" || role === "owner"
+      : Boolean(OPERATOR_TOKEN);
 
   const applyProjectStatus = useCallback((status: Project["status"], markTime: boolean) => {
     setProject((prev) => (prev.status === status ? prev : { ...prev, status }));
@@ -211,7 +230,7 @@ export function useJuno(): JunoState {
       // another tenant's project.
       const { data: memberships, error: membershipError } = await supabase
         .from("project_members")
-        .select("project_id")
+        .select("project_id, role")
         .order("created_at", { ascending: true })
         .limit(1);
       if (cancelled) return;
@@ -219,13 +238,18 @@ export function useJuno(): JunoState {
         setAccessError(membershipError.message);
         return;
       }
-      const membership = memberships?.[0] as { project_id: string } | undefined;
+      const membership = memberships?.[0] as
+        | { project_id: string; role: string }
+        | undefined;
       if (!membership) {
         setAccessError(
           "This account is not a member of any JunoGuard project. Ask an owner to add you.",
         );
         return;
       }
+      // The gateway is the authority on this; reflecting it here keeps the
+      // button from promising something the API will refuse.
+      setRole(membership.role);
 
       const { data: projects } = await supabase
         .from("projects")
@@ -499,16 +523,34 @@ export function useJuno(): JunoState {
 
     void (async () => {
       try {
+        // Suspend and resume are human decisions, and the gateway refuses agent
+        // keys on them. Send the signed-in session, or the operator token on a
+        // local deployment with nothing to sign into.
+        const control: Record<string, string> = {};
+        if (supabase) {
+          const { data } = await supabase.auth.getSession();
+          const accessToken = data.session?.access_token;
+          if (!accessToken) {
+            setKillError("Sign in again — the session has expired.");
+            return;
+          }
+          control.Authorization = `Bearer ${accessToken}`;
+        } else if (OPERATOR_TOKEN) {
+          control["X-Juno-Operator"] = OPERATOR_TOKEN;
+        } else {
+          setKillError(
+            "No operator credential. Set VITE_JUNO_OPERATOR_TOKEN, or sign in.",
+          );
+          return;
+        }
+
         const res = await fetch(`${apiUrl}/v1/projects/${path}`, {
           method: "POST",
-          headers: {
-            "X-Juno-Key": JUNO_KEY,
-            ...(next === "suspended" ? { "Content-Type": "application/json" } : {}),
-          },
-          body:
-            next === "suspended"
-              ? JSON.stringify({ reason: "Manual suspend from dashboard" })
-              : undefined,
+          headers: { ...control, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id: projectIdRef.current,
+            ...(next === "suspended" ? { reason: "Manual suspend from dashboard" } : {}),
+          }),
         });
         if (!res.ok) {
           setKillError(await readError(res));
@@ -545,6 +587,8 @@ export function useJuno(): JunoState {
     killError,
     accessError,
     feedError,
+    role,
+    canControl,
     toggleSuspend,
   };
 }

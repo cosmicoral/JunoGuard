@@ -62,9 +62,13 @@ Data source precedence (see `docs/api-contract.md`):
    only this project's events)
 3. **Mock** — neither configured
 
-The kill switch POSTs `/v1/projects/suspend` or `/v1/projects/resume` with
-`X-Juno-Key`. Failures surface in the header — the UI does not flip until the
-gateway confirms.
+The kill switch POSTs `/v1/projects/suspend` or `/v1/projects/resume` with an
+**operator identity** — the signed-in Supabase session, or `X-Juno-Operator`
+matching the gateway's `OPERATOR_TOKEN` on a deployment with nothing to sign
+into. Agent keys are refused on these endpoints, so no credential in this bundle
+can take a project offline. Suspend needs the `operator` role and resume needs
+`owner`; the button is disabled when the account holds neither. Failures surface
+in the header — the UI does not flip until the gateway confirms.
 
 ## Demo controls
 

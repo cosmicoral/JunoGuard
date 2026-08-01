@@ -87,6 +87,8 @@ export function Dashboard() {
           avatarUrl={avatarUrl}
           signingOut={signingOut}
           authError={authError}
+          canControl={juno.canControl}
+          role={juno.role}
           onSignOut={() => void handleSignOut()}
           onToggleSuspend={juno.toggleSuspend}
         />

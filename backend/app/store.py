@@ -118,6 +118,18 @@ class MemoryStore:
         matched = hmac.compare_digest(key_hash(api_key), self.project["api_key_hash"])
         return self.project if matched else None
 
+    def get_project_by_id(self, project_id: str) -> dict[str, Any] | None:
+        return self.project if project_id == self.project["id"] else None
+
+    def sole_project_id(self) -> str | None:
+        """This backend holds exactly one project, so control actions may omit it."""
+        return str(self.project["id"])
+
+    def get_member_role(self, project_id: str, user_id: str) -> str | None:
+        # No membership table in memory: this backend exists for local runs,
+        # where the operator token is the way in.
+        return None
+
     def get_policy(self, project_id: str) -> dict[str, Any]:
         return self.policy
 
@@ -286,6 +298,26 @@ class SupabaseStore:
             limit=1,
         )
         return rows[0] if rows else None
+
+    def get_project_by_id(self, project_id: str) -> dict[str, Any] | None:
+        rows = self._get(
+            "/projects", id=f"eq.{project_id}", select=PROJECT_SELECT, limit=1
+        )
+        return rows[0] if rows else None
+
+    def sole_project_id(self) -> str | None:
+        """A real deployment holds many projects; the caller must name one."""
+        return None
+
+    def get_member_role(self, project_id: str, user_id: str) -> str | None:
+        rows = self._get(
+            "/project_members",
+            project_id=f"eq.{project_id}",
+            user_id=f"eq.{user_id}",
+            select="role",
+            limit=1,
+        )
+        return rows[0]["role"] if rows else None
 
     def get_policy(self, project_id: str) -> dict[str, Any]:
         rows = self._get("/policies", project_id=f"eq.{project_id}", select="*", limit=1)

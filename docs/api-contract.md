@@ -153,8 +153,26 @@ cost nothing and do not.
 
 The kill switch. Used by the dashboard.
 
+**These are human-control endpoints and they do not accept `X-Juno-Key`.** An
+agent key lives in agent configs and CI environments; it authorizes asking for a
+decision, not taking a project offline. A valid agent key gets `401` here.
+
+Send an operator identity instead:
+
+| Credential | Header | Use |
+|---|---|---|
+| Supabase session | `Authorization: Bearer <access token>` | Normal deployments; the role is read from `project_members` |
+| Operator token | `X-Juno-Operator: <OPERATOR_TOKEN>` | Local deployments with no Supabase to sign into |
+
+Roles are ordered `viewer < operator < owner`. **Suspend** needs `operator`.
+**Resume** needs `owner` — stopping something should be easy and reversing it
+deliberate. Anything less gets `403`.
+
 ```jsonc
-{ "reason": "Manual suspend from dashboard" }
+{
+  "reason": "Manual suspend from dashboard",
+  "project_id": "uuid"        // optional only on a single-project deployment
+}
 ```
 
 Returns the **public project view** — never the agent key or its hash:
@@ -166,7 +184,13 @@ Returns the **public project view** — never the agent key or its hash:
   "status": "suspended",
   "suspended_at": "2026-08-01T14:22:07Z",
   "suspended_reason": "Manual suspend from dashboard",
-  "api_key_prefix": "jg_demo_key"
+  "api_key_prefix": "jg_demo_key",
+  "actor": {
+    "actor_kind": "user",         // user | operator_token
+    "actor_id": "auth.users uuid",
+    "actor_role": "owner",
+    "actor_email": "operator@example.com"
+  }
 }
 ```
 

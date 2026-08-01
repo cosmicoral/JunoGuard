@@ -20,6 +20,8 @@ export function Header({
   avatarUrl,
   signingOut,
   authError,
+  canControl,
+  role,
   onSignOut,
   onToggleSuspend,
 }: {
@@ -31,6 +33,8 @@ export function Header({
   avatarUrl: string | null;
   signingOut: boolean;
   authError: string | null;
+  canControl: boolean;
+  role: string | null;
   onSignOut: () => void;
   onToggleSuspend: () => void;
 }) {
@@ -86,6 +90,14 @@ export function Header({
         data-suspended={suspended}
         onClick={onToggleSuspend}
         aria-pressed={suspended}
+        disabled={!canControl}
+        title={
+          canControl
+            ? undefined
+            : suspended
+              ? `Resuming a project is owner-only${role ? ` — this account is ${role}` : ""}.`
+              : `Suspending a project needs the operator role${role ? ` — this account is ${role}` : ""}.`
+        }
       >
         {suspended ? "RESET" : "SUSPEND"}
       </button>

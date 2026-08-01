@@ -350,10 +350,20 @@ body[data-suspended="true"] {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .kill:hover {
+  .kill:hover:not(:disabled) {
     background: rgba(248, 81, 73, 0.16);
     border-color: rgba(248, 81, 73, 0.7);
   }
+}
+
+/* This account cannot change project state. Reads as unavailable rather than
+   as a live control that will 403. */
+.kill:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  border-color: var(--border);
+  color: var(--muted);
+  background: transparent;
 }
 
 .kill:active {
