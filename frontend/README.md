@@ -47,11 +47,20 @@ The browser uses the PKCE OAuth flow. Supabase persists and refreshes the
 session, `/auth/callback` exchanges the authorization code, and unauthenticated
 dashboard visits return to `/auth/sign-in`.
 
-## Mock mode vs live
+## Demo mode vs live
 
-Mock mode is the default. It seeds ~55 rows of plausible history so the feed
-is never empty, then emits new actions on a timer at roughly 22–25 req/min
-against a 30/min policy cap.
+**The mode is declared, not inferred.** `VITE_JUNO_MODE=live` makes sign-in
+mandatory; if its Supabase credentials are missing, `/dashboard` reports a
+configuration error instead of opening — removing a variable is not a way past
+the gate. `VITE_JUNO_MODE=demo` gives a labelled simulation that needs no
+account. Unset resolves to live when Supabase is configured and demo otherwise,
+which suits a local checkout and nothing that gets deployed.
+
+A demo build says so on screen, above the header, for the whole session.
+
+Demo mode seeds ~55 rows of plausible history so the feed is never empty, then
+emits new actions on a timer at roughly 22–25 req/min against a 30/min policy
+cap.
 
 Data source precedence (see `docs/api-contract.md`):
 

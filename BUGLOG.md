@@ -31,7 +31,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-004 | P0 | FIXED | Scanner outage produces a proceedable `flag` instead of failing closed |
 | JG-005 | P1 | FIXED | Event backfill and SSE stream are unauthenticated and global |
 | JG-006 | P1 | FIXED | OAuth does not protect kill-switch operations; the browser ships an agent key |
-| JG-007 | P1 | OPEN | OAuth regression makes the default mock/offline dashboard unreachable |
+| JG-007 | P1 | FIXED | OAuth regression makes the default mock/offline dashboard unreachable |
 | JG-008 | P1 | OPEN | A configured live dashboard silently degrades to mock data |
 | JG-009 | P1 | OPEN | CLI and MCP enforcement can be bypassed by supported install paths |
 | JG-010 | P1 | OPEN | Package verdict cache can preserve a stale `latest` allow indefinitely |
@@ -240,7 +240,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-007 — OAuth breaks the default mock/offline dashboard
 
 **Priority:** P1 / High  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** Documentation says the frontend runs in mock mode without
 > credentials, but `/dashboard` is now always wrapped in `ProtectedRoute`.

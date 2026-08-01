@@ -4,6 +4,7 @@ import { useAuth } from "./auth/AuthContext";
 import { Header } from "./components/Header";
 import { Stats } from "./components/Stats";
 import { Feed } from "./components/Feed";
+import { mode } from "./lib/supabase";
 import { useJuno } from "./lib/useJuno";
 
 export function Dashboard() {
@@ -78,6 +79,15 @@ export function Dashboard() {
       </AnimatePresence>
 
       <div className="app">
+        {mode === "demo" && (
+          <p className="mode-banner" data-mode="demo" role="status">
+            <strong>DEMO</strong>
+            {juno.source === "mock"
+              ? "Simulated traffic. No agent is being supervised and the kill switch changes nothing outside this page."
+              : "Demo build. The decisions below are real, but this is not a production control plane."}
+          </p>
+        )}
+
         <Header
           projectName={juno.project.name}
           suspended={juno.suspended}

@@ -17,6 +17,42 @@ export const dataSource: DataSource =
 
 export const isSupabaseConfigured = Boolean(url && anonKey);
 
+/**
+ * Whether this build is a demo or a control plane.
+ *
+ * Previously this was inferred from whether credentials happened to be present,
+ * which made two bad outcomes possible at once: a clean checkout could not reach
+ * the dashboard at all (sign-in was mandatory but impossible), and a real
+ * deployment could in principle be softened by removing a variable.
+ *
+ * It is now declared. `VITE_JUNO_MODE=live` means authentication is mandatory —
+ * and if its credentials are missing the app says so and stops, rather than
+ * falling back to something more permissive. Only an undeclared local build
+ * falls back to demo.
+ */
+export type JunoMode = "demo" | "live";
+
+const declaredMode = (import.meta.env.VITE_JUNO_MODE as string | undefined)
+  ?.trim()
+  .toLowerCase();
+
+export const modeIsDeclared = declaredMode === "live" || declaredMode === "demo";
+
+export const mode: JunoMode =
+  declaredMode === "live"
+    ? "live"
+    : declaredMode === "demo"
+      ? "demo"
+      : isSupabaseConfigured
+        ? "live"
+        : "demo";
+
+/**
+ * Live mode declared, but the credentials it needs are absent. Never resolved
+ * by relaxing the gate: removing a variable must not be a way past sign-in.
+ */
+export const isMisconfigured = mode === "live" && !isSupabaseConfigured;
+
 /** True when the feed is driven by a live source rather than the mock timer. */
 export const isLive = dataSource !== "mock";
 
