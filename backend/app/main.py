@@ -6,13 +6,16 @@ parallel, so treat it as frozen.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+import asyncio
+import json
+from typing import Any, AsyncIterator, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import config, pricing, provider, risk
+from . import config, events, pricing, provider, risk
 from .store import store
 
 app = FastAPI(title="JunoGuard API", version="0.2.0")
@@ -81,6 +84,18 @@ def _persist(project: dict[str, Any], verdict: risk.Verdict, **row: Any) -> str:
         }
     )
 
+    events.publish(
+        "action",
+        {
+            "id": action_id,
+            "decision": verdict.decision,
+            "reason": verdict.reason,
+            "risk_level": verdict.risk_level,
+            "metadata": verdict.metadata,
+            **row,
+        },
+    )
+
     if verdict.incident:
         store.record_incident(
             {
@@ -90,9 +105,11 @@ def _persist(project: dict[str, Any], verdict: risk.Verdict, **row: Any) -> str:
                 **verdict.incident,
             }
         )
+        events.publish("incident", {"action_id": action_id, **verdict.incident})
 
     if verdict.suspend:
         store.set_status(project["id"], "suspended", verdict.reason)
+        events.publish("project", {"status": "suspended", "reason": verdict.reason})
 
     return action_id
 
@@ -224,9 +241,55 @@ def suspend(
     payload: SuspendRequest, project: dict[str, Any] = Depends(current_project)
 ) -> dict[str, Any]:
     """The kill switch. Both lanes go dark until this is manually reversed."""
-    return store.set_status(project["id"], "suspended", payload.reason)
+    updated = store.set_status(project["id"], "suspended", payload.reason)
+    events.publish("project", {"status": "suspended", "reason": payload.reason})
+    return updated
 
 
 @app.post("/v1/projects/resume")
 def resume(project: dict[str, Any] = Depends(current_project)) -> dict[str, Any]:
-    return store.set_status(project["id"], "active", None)
+    updated = store.set_status(project["id"], "active", None)
+    events.publish("project", {"status": "active", "reason": None})
+    return updated
+
+
+# --- live feed --------------------------------------------------------------
+
+
+@app.get("/v1/events/recent")
+def recent_events(limit: int = 50) -> dict[str, Any]:
+    """Backfill, so the dashboard is never empty on load."""
+    return {"cursor": events.latest_seq(), "events": events.recent(limit)}
+
+
+@app.get("/v1/events/stream")
+async def stream_events(cursor: int = 0) -> StreamingResponse:
+    """Server-sent events.
+
+    The dashboard's fallback when Supabase Realtime is not configured, so the
+    demo does not depend on a credential arriving. Pass the cursor from
+    /v1/events/recent to resume without gaps.
+    """
+
+    async def generate() -> AsyncIterator[str]:
+        last = cursor
+        idle = 0
+        while True:
+            for event in events.since(last):
+                last = event["seq"]
+                idle = 0
+                yield f"event: {event['type']}\ndata: {json.dumps(event['data'])}\n\n"
+
+            await asyncio.sleep(0.25)
+            idle += 1
+
+            # Keep proxies and browsers from closing an idle connection.
+            if idle >= 60:
+                idle = 0
+                yield ": keepalive\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

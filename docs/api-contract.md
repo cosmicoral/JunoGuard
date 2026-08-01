@@ -133,6 +133,46 @@ Returns the updated project. While suspended, **both lanes** return
 
 ---
 
+## Live feed — `GET /v1/events/recent` · `GET /v1/events/stream`
+
+The dashboard's **fallback** when Supabase Realtime is not configured. Prefer
+Supabase when `VITE_SUPABASE_URL` is set; use this otherwise, so the demo never
+depends on a credential arriving. No auth — local only.
+
+Backfill first so the feed is never empty on load:
+
+```jsonc
+// GET /v1/events/recent?limit=50
+{
+  "cursor": 42,
+  "events": [ { "seq": 41, "type": "action", "data": { … } } ]
+}
+```
+
+Then stream from that cursor:
+
+```
+GET /v1/events/stream?cursor=42        text/event-stream
+```
+
+Three event types. `data` is the JSON payload.
+
+| Event | Payload |
+|---|---|
+| `action` | The full action row — `id`, `decision`, `reason`, `risk_level`, `action_type`, `target`, `tokens_in`, `tokens_out`, `cost_usd`, `metadata` |
+| `incident` | `action_id`, `severity`, `title`, `evidence` |
+| `project` | `status`, `reason` — emitted on suspend and resume |
+
+`metadata.blast_radius` on a blocked install carries the inline expand content.
+
+```js
+const es = new EventSource("http://localhost:8000/v1/events/stream?cursor=0")
+es.addEventListener("action",   e => addRow(JSON.parse(e.data)))
+es.addEventListener("project",  e => setStatus(JSON.parse(e.data).status))
+```
+
+---
+
 ## `GET /health`
 
 ```jsonc
