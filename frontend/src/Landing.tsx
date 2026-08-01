@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { BrandMark } from "./components/BrandMark";
+import { BrandLockup, BrandMark } from "./components/BrandMark";
 import { AGENT_MARKS, STACK_MARKS } from "./components/SystemMarks";
 
 const PACKAGE = "@heysalad/junoguard";
@@ -28,7 +28,6 @@ function CopyCommand({ command }: { command: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      // Clipboard is blocked outside a secure context; the text stays selectable.
       setCopied(false);
     }
   }
@@ -93,23 +92,33 @@ function DecisionConsole() {
 
 export function Landing() {
   const reduce = useReducedMotion() ?? false;
-  const reveal = reduce ? {} : { initial: { opacity: 0, y: 18 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: 0.2 }, transition: { duration: 0.55, ease: [0.23, 1, 0.32, 1] as const } };
+  const reveal = reduce
+    ? {}
+    : {
+        initial: { opacity: 0, y: 18 },
+        whileInView: { opacity: 1, y: 0 },
+        viewport: { once: true, amount: 0.2 },
+        transition: { duration: 0.55, ease: [0.23, 1, 0.32, 1] as const },
+      };
 
   return (
     <main className="landing-shell">
       <header className="landing-nav">
         <a className="landing-brand" href="#top" aria-label="JunoGuard home">
-          <BrandMark className="landing-mark" size={29} />
-          <span>JUNOGUARD</span>
+          <BrandLockup size={28} />
         </a>
         <nav aria-label="Primary navigation">
           <a href="#product">Product</a>
           <a href="#how">How it works</a>
           <a href="#architecture">Architecture</a>
           <a href="#install">Install</a>
-          <a href="https://github.com/cosmicoral/TokenGuard" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://github.com/cosmicoral/TokenGuard" target="_blank" rel="noreferrer">
+            GitHub
+          </a>
         </nav>
-        <a className="nav-console" href="/dashboard">Live console <span>↗</span></a>
+        <a className="nav-console" href="/dashboard">
+          Live console <span>↗</span>
+        </a>
       </header>
 
       <section className="landing-hero" id="top">
@@ -119,8 +128,9 @@ export function Landing() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65, ease: [0.23, 1, 0.32, 1] }}
         >
-          {/* No lockup here — the nav carries the brand 40px above it, and
-              repeating it just pushes the headline down the fold. */}
+          <p className="hero-tagline">
+            DIGITAL <em>TRUST</em>. CONTINUOUSLY.
+          </p>
           <h1>The control plane between your agent and the blast radius.</h1>
           <p className="hero-lede">
             Every install, model call, and policy breach — decided before it
@@ -130,7 +140,7 @@ export function Landing() {
             <a className="primary-action" href="/dashboard">
               Open live console <span>→</span>
             </a>
-            <a className="text-action" href="#how">
+            <a className="secondary-action" href="#how">
               See the gate in action
             </a>
           </div>
@@ -142,6 +152,7 @@ export function Landing() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.12, duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
         >
+          <div className="hero-glass" aria-hidden="true" />
           <div className="console-caption">
             <span>LIVE PRODUCT SURFACE</span>
             <span>GATE / ACTIVE</span>
@@ -177,7 +188,10 @@ export function Landing() {
           <h2>Your coding agent has your credentials, your shell, and no judgment.</h2>
         </motion.div>
         <motion.div className="thesis-copy" {...reveal}>
-          <p>A dependency can instruct an agent to install malware. A stolen key can burn budget in minutes. Default tooling shows the damage after it happens.</p>
+          <p>
+            A dependency can instruct an agent to install malware. A stolen key can burn budget in
+            minutes. Default tooling shows the damage after it happens.
+          </p>
           <p>JunoGuard is the interrupt: a supervision layer that sits between intent and execution.</p>
         </motion.div>
       </section>
@@ -185,7 +199,11 @@ export function Landing() {
       <section className="gate-section" id="how">
         <div className="gate-intro">
           <p className="section-index">THE GATE / 02</p>
-          <h2>One decision engine.<br />Two attack lanes.</h2>
+          <h2>
+            One decision engine.
+            <br />
+            Two attack lanes.
+          </h2>
         </div>
         <div className="gate-grid">
           <motion.article className="gate-card supply" {...reveal}>
@@ -193,12 +211,21 @@ export function Landing() {
             <div>
               <p className="card-label">SUPPLY CHAIN</p>
               <h3>Stop the package before it reaches disk.</h3>
-              <p>Every install is intercepted over MCP, scanned for known risk, and refused with a structured reason the agent can understand.</p>
+              <p>
+                Every install is intercepted over MCP, scanned for known risk, and refused with a
+                structured reason the agent can understand.
+              </p>
             </div>
             <ul>
-              <li><span>01</span> Pre-install interception</li>
-              <li><span>02</span> Malware verdicts from Ossprey</li>
-              <li><span>03</span> No verdict means no install</li>
+              <li>
+                <span>01</span> Pre-install interception
+              </li>
+              <li>
+                <span>02</span> Malware verdicts from Ossprey
+              </li>
+              <li>
+                <span>03</span> No verdict means no install
+              </li>
             </ul>
           </motion.article>
 
@@ -207,11 +234,16 @@ export function Landing() {
             <div>
               <p className="card-label">TOKENS &amp; COST</p>
               <h3>Make abnormal spend a security signal.</h3>
-              <p>Local pricing, hard budgets, rate limits, and burst detection stop runaway loops without spending more AI tokens to protect them.</p>
+              <p>
+                Local pricing, hard budgets, rate limits, and burst detection stop runaway loops
+                without spending more AI tokens to protect them.
+              </p>
             </div>
             <div className="rate-plot" aria-label="Request rate crossing a policy limit">
               <span className="plot-limit">POLICY LIMIT</span>
-              {[22, 35, 28, 48, 58, 38, 72, 88, 44, 63, 96, 68].map((height, index) => <i key={index} style={{ height: `${height}%` }} />)}
+              {[22, 35, 28, 48, 58, 38, 72, 88, 44, 63, 96, 68].map((height, index) => (
+                <i key={index} style={{ height: `${height}%` }} />
+              ))}
             </div>
           </motion.article>
         </div>
@@ -220,32 +252,68 @@ export function Landing() {
       <section className="architecture-section" id="architecture">
         <div className="architecture-head">
           <p className="section-index">ARCHITECTURE / 03</p>
-          <h2>Fast where it must be.<br />Deep where it matters.</h2>
+          <h2>
+            Fast where it must be.
+            <br />
+            Deep where it matters.
+          </h2>
         </div>
         <div className="flow" aria-label="JunoGuard request flow">
-          <div><span>01</span><strong>AGENT</strong><small>requests an action</small></div>
+          <div>
+            <span>01</span>
+            <strong>AGENT</strong>
+            <small>requests an action</small>
+          </div>
           <i>→</i>
-          <div className="flow-core"><span>02</span><strong>JUNO</strong><small>evaluates policy</small></div>
+          <div className="flow-core">
+            <span>02</span>
+            <strong>JUNO</strong>
+            <small>evaluates policy</small>
+          </div>
           <i>→</i>
-          <div><span>03</span><strong>DECISION</strong><small>allow / flag / block</small></div>
+          <div>
+            <span>03</span>
+            <strong>DECISION</strong>
+            <small>allow / flag / block</small>
+          </div>
           <i>→</i>
-          <div><span>04</span><strong>EVIDENCE</strong><small>records the radius</small></div>
+          <div>
+            <span>04</span>
+            <strong>EVIDENCE</strong>
+            <small>records the radius</small>
+          </div>
         </div>
         <div className="principles">
-          <div><b>~0 ms</b><span>LLM latency added</span></div>
-          <div><b>1 gate</b><span>across both lanes</span></div>
-          <div><b>100%</b><span>deterministic hot path</span></div>
-          <p>No AI on the hot path, so a decision costs no tokens and adds no latency. Deep out-of-band analysis of flagged packages is on the roadmap, not in the product.</p>
+          <div>
+            <b>~0 ms</b>
+            <span>LLM latency added</span>
+          </div>
+          <div>
+            <b>1 gate</b>
+            <span>across both lanes</span>
+          </div>
+          <div>
+            <b>100%</b>
+            <span>deterministic hot path</span>
+          </div>
+          <p>
+            No AI on the hot path, so a decision costs no tokens and adds no latency. Deep
+            out-of-band analysis of flagged packages is on the roadmap, not in the product.
+          </p>
         </div>
       </section>
 
       <section className="install-section" id="install">
         <div className="install-head">
           <p className="section-index">INSTALL / 04</p>
-          <h2>One command.<br />Every agent you use.</h2>
+          <h2>
+            One command.
+            <br />
+            Every agent you use.
+          </h2>
           <p className="install-lede">
-            JunoGuard ships as an MCP server and a CLI in one package. Point your
-            agent at it once and every install it attempts is checked first.
+            JunoGuard ships as an MCP server and a CLI in one package. Point your agent at it once
+            and every install it attempts is checked first.
           </p>
           <a className="text-action" href={NPM_URL} target="_blank" rel="noreferrer">
             {PACKAGE} on npm ↗
@@ -261,25 +329,38 @@ export function Landing() {
             </motion.div>
           ))}
           <p className="install-foot">
-            Requires Node 18+. Live use needs a JunoGuard gateway and a project
-            key — there is no default key, and an unconfigured guard refuses
-            rather than waves through.
+            Requires Node 18+. Live use needs a JunoGuard gateway and a project key — there is no
+            default key, and an unconfigured guard refuses rather than waves through.
           </p>
         </div>
       </section>
 
       <section className="final-cta">
         <p className="section-index">READY / 05</p>
-        <h2>Give your agent<br />a line it cannot cross.</h2>
+        <h2>
+          Give your agent
+          <br />a line it cannot cross.
+        </h2>
         <div>
-          <a className="primary-action" href="/dashboard">Launch the live console <span>→</span></a>
-          <a className="text-action" href="https://github.com/cosmicoral/TokenGuard" target="_blank" rel="noreferrer">Read the source on GitHub ↗</a>
+          <a className="primary-action" href="/dashboard">
+            Launch the live console <span>→</span>
+          </a>
+          <a
+            className="secondary-action"
+            href="https://github.com/cosmicoral/TokenGuard"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Read the source on GitHub ↗
+          </a>
         </div>
       </section>
 
       <footer className="landing-footer">
-        <a className="landing-brand" href="#top"><BrandMark className="landing-mark" size={29} /><span>JUNOGUARD</span></a>
-        <p>The supervision layer for AI coding agents.</p>
+        <a className="landing-brand" href="#top">
+          <BrandLockup size={24} />
+        </a>
+        <p>Digital trust. Continuously.</p>
         <span>BUILT IN LONDON · 2026</span>
       </footer>
     </main>

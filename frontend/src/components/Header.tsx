@@ -34,7 +34,7 @@ export function Header({
     <header className="panel header" data-suspended={suspended}>
       <div className="brand">
         <BrandMark className="mark" size={20} suspended={suspended} />
-        <span className="wordmark">JUNO</span>
+        <span className="wordmark">JUNOGUARD</span>
       </div>
 
       <div className="brand-rule" />

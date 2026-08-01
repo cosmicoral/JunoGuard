@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BrandLockup } from "../components/BrandMark";
 import { supabase } from "../lib/supabase";
 
 let pendingCode: string | null = null;
@@ -50,8 +51,7 @@ export function AuthCallback() {
     <main className="auth-page">
       <section className="auth-card" aria-live="polite">
         <a className="auth-brand" href="/" aria-label="JunoGuard home">
-          <span className="auth-mark" aria-hidden="true"><span /><span /><span /></span>
-          JUNOGUARD
+          <BrandLockup size={28} />
         </a>
         {error ? (
           <>
