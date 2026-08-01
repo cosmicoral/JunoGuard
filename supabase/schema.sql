@@ -124,9 +124,9 @@ alter publication supabase_realtime add table projects;
 
 -- ---------------------------------------------------------------------------
 -- RLS
--- The gateway uses the service role and bypasses these. The dashboard reads
--- with the anon key, so reads are open and writes are closed: nothing but
--- Juno may record a decision.
+-- The gateway uses the service role and bypasses these. The browser client
+-- carries the signed-in user's JWT, so dashboard reads require auth.uid().
+-- Writes remain closed: nothing but Juno may record a decision.
 -- ---------------------------------------------------------------------------
 
 alter table projects      enable row level security;
@@ -134,17 +134,25 @@ alter table policies      enable row level security;
 alter table agent_actions enable row level security;
 alter table incidents     enable row level security;
 
+drop policy if exists "dashboard reads projects" on projects;
 create policy "dashboard reads projects"
-    on projects for select using (true);
+    on projects for select to authenticated
+    using ((select auth.uid()) is not null);
 
+drop policy if exists "dashboard reads policies" on policies;
 create policy "dashboard reads policies"
-    on policies for select using (true);
+    on policies for select to authenticated
+    using ((select auth.uid()) is not null);
 
+drop policy if exists "dashboard reads actions" on agent_actions;
 create policy "dashboard reads actions"
-    on agent_actions for select using (true);
+    on agent_actions for select to authenticated
+    using ((select auth.uid()) is not null);
 
+drop policy if exists "dashboard reads incidents" on incidents;
 create policy "dashboard reads incidents"
-    on incidents for select using (true);
+    on incidents for select to authenticated
+    using ((select auth.uid()) is not null);
 
 -- ---------------------------------------------------------------------------
 -- Demo seed

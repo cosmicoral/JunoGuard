@@ -209,15 +209,16 @@ uvicorn app.main:app --reload
 ```
 
 ```bash
-# Frontend — runs on mock data with no backend and no credentials
+# Frontend — Google sign-in and live data use Supabase; FastAPI is optional
 cd frontend
 npm install
-npm run dev
+npm run dev          # configure frontend/.env.local for dashboard access
 ```
 
-The dashboard switches from mock data to Supabase Realtime as soon as
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are present. See
-[`frontend/README.md`](frontend/README.md) for the demo controls.
+Google sign-in and protected dashboard access require `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY`. Those same variables switch the data feed from mock
+mode to Supabase Realtime. See [`frontend/README.md`](frontend/README.md) for
+OAuth setup and demo controls.
 
 Health check:
 

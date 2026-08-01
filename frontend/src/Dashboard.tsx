@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useAuth } from "./auth/AuthContext";
 import { Header } from "./components/Header";
 import { Stats } from "./components/Stats";
 import { Feed } from "./components/Feed";
@@ -7,7 +8,35 @@ import { useJuno } from "./lib/useJuno";
 
 export function Dashboard() {
   const juno = useJuno();
+  const { user, signOut } = useAuth();
   const reduce = useReducedMotion() ?? false;
+  const [signingOut, setSigningOut] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const metadata = user?.user_metadata ?? {};
+  const userEmail = user?.email ?? "Email unavailable";
+  const userName =
+    (typeof metadata.full_name === "string" && metadata.full_name) ||
+    (typeof metadata.name === "string" && metadata.name) ||
+    user?.email?.split("@")[0] ||
+    "JunoGuard user";
+  const avatarUrl =
+    (typeof metadata.avatar_url === "string" && metadata.avatar_url) ||
+    (typeof metadata.picture === "string" && metadata.picture) ||
+    null;
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    setAuthError(null);
+    try {
+      await signOut();
+      window.location.replace("/auth/sign-in");
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Unable to sign out.");
+      setSigningOut(false);
+    }
+  };
 
   useEffect(() => {
     document.body.dataset.suspended = String(juno.suspended);
@@ -47,8 +76,13 @@ export function Dashboard() {
         <Header
           projectName={juno.project.name}
           suspended={juno.suspended}
-          actionsToday={juno.actionsToday}
           killError={juno.killError}
+          userName={userName}
+          userEmail={userEmail}
+          avatarUrl={avatarUrl}
+          signingOut={signingOut}
+          authError={authError}
+          onSignOut={() => void handleSignOut()}
           onToggleSuspend={juno.toggleSuspend}
         />
 

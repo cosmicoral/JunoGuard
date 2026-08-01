@@ -14,16 +14,28 @@ function JunoMark({ suspended }: { suspended: boolean }) {
 export function Header({
   projectName,
   suspended,
-  actionsToday,
   killError,
+  userName,
+  userEmail,
+  avatarUrl,
+  signingOut,
+  authError,
+  onSignOut,
   onToggleSuspend,
 }: {
   projectName: string;
   suspended: boolean;
-  actionsToday: number;
   killError: string | null;
+  userName: string;
+  userEmail: string;
+  avatarUrl: string | null;
+  signingOut: boolean;
+  authError: string | null;
+  onSignOut: () => void;
   onToggleSuspend: () => void;
 }) {
+  const initial = (userName || userEmail).trim().charAt(0).toUpperCase() || "?";
+
   return (
     <header className="panel header" data-suspended={suspended}>
       <div className="brand">
@@ -46,17 +58,30 @@ export function Header({
 
       <div className="spacer" />
 
-      {killError ? (
-        <span className="kill-error" role="alert" title={killError}>
-          {killError}
+      {killError || authError ? (
+        <span className="kill-error" role="alert" title={killError ?? authError ?? undefined}>
+          {killError ?? authError}
         </span>
-      ) : (
-        <span className="uptime">
-          {actionsToday.toLocaleString("en-US")} actions gated today
+      ) : null}
+
+      <div className="account" title={`${userName} · ${userEmail}`}>
+        {avatarUrl ? (
+          <img className="account-avatar" src={avatarUrl} alt="" referrerPolicy="no-referrer" />
+        ) : (
+          <span className="account-avatar account-initial" aria-hidden="true">{initial}</span>
+        )}
+        <span className="account-copy">
+          <strong>{userName}</strong>
+          <small>{userEmail}</small>
         </span>
-      )}
+      </div>
+
+      <button className="sign-out" type="button" onClick={onSignOut} disabled={signingOut}>
+        {signingOut ? "SIGNING OUT…" : "SIGN OUT"}
+      </button>
 
       <button
+        type="button"
         className="kill"
         data-suspended={suspended}
         onClick={onToggleSuspend}

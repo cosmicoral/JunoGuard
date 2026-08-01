@@ -1,15 +1,37 @@
 # JunoGuard — site and live dashboard
 
-The root route is JunoGuard's product landing page. The operational demo lives
-at `/dashboard`: everything Juno decides appears there, both lanes interleaved
-in a single feed, and one button closes the gate.
+The root route is JunoGuard's product landing page. The authenticated
+operational console lives at `/dashboard`: everything Juno decides appears
+there, both lanes interleaved in a single feed, and one button closes the gate.
 
 ```bash
 npm install
 npm run dev          # http://localhost:5173
 ```
 
-Runs with **mock data out of the box** — no backend, no Supabase, no keys.
+The landing and sign-in screens run without a backend. Dashboard access uses
+Google OAuth through Supabase and therefore requires the two Supabase frontend
+variables below. The FastAPI gateway remains optional for the dashboard; with
+Supabase configured, the feed comes from Supabase Realtime.
+
+## Google OAuth
+
+1. In Supabase Authentication → Providers, enable Google and add the client ID
+   and secret from Google Cloud.
+2. In Google Cloud, add Supabase's callback URL as an authorized redirect URI:
+   `https://<project-ref>.supabase.co/auth/v1/callback`.
+3. In Supabase Authentication → URL Configuration, set the Site URL and add
+   `http://localhost:5173/auth/callback` plus the production callback URL to
+   the redirect allow list.
+4. Copy `.env.example` to `.env.local`, then set `VITE_SUPABASE_URL` and
+   `VITE_SUPABASE_ANON_KEY`.
+5. Apply `supabase/schema.sql` for a fresh database, or apply
+   `supabase/migrations/202608010001_require_authenticated_dashboard_reads.sql`
+   to an existing database so anonymous clients cannot read dashboard data.
+
+The browser uses the PKCE OAuth flow. Supabase persists and refreshes the
+session, `/auth/callback` exchanges the authorization code, and unauthenticated
+dashboard visits return to `/auth/sign-in`.
 
 ## Mock mode vs live
 
@@ -57,6 +79,7 @@ entire Lane B argument in one glyph.
 ```
 src/
   App.tsx                 landing/dashboard route selection
+  auth/                   session context, sign-in, callback, route guard
   Landing.tsx             product landing page
   Dashboard.tsx           dashboard shell and kill-switch screen state
   lib/useJuno.ts          state, mock timer, Realtime subscriptions, rollups
