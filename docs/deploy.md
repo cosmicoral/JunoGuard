@@ -37,7 +37,7 @@ secret manager:
 ```sql
 -- Generate a key outside the database (e.g. openssl rand -hex 24), then:
 select set_config('junoguard.demo_project_key', 'jg_live_yourkeyhere', false);
--- Re-run the seed block at the end of supabase/schema.sql, or insert directly:
+-- Or insert directly (the hash is what the gateway matches against):
 insert into projects (name, api_key_hash, api_key_prefix)
 values ('Production', encode(digest('jg_live_yourkeyhere','sha256'),'hex'),
         left('jg_live_yourkeyhere', 12));

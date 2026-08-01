@@ -43,7 +43,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-016 | P2 | FIXED | Production deployment is blocked by localhost-only CORS and missing hosting config |
 | JG-017 | P2 | OPEN | Frontend toolchain has known high/moderate development-server vulnerabilities |
 | JG-018 | P2 | OPEN | Python dependencies are unpinned and builds are not reproducible |
-| JG-019 | P2 | OPEN | Supabase bootstrap SQL is not safely rerunnable |
+| JG-019 | P2 | FIXED | Supabase bootstrap SQL is not safely rerunnable |
 
 ## Confirmed findings
 
@@ -514,8 +514,8 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 
 ### JG-019 — Supabase bootstrap SQL is not safely rerunnable
 
-**Priority:** P2 / Medium  
-**Status:** OPEN
+**Priority:** P2 / Medium
+**Status:** FIXED
 
 > **Review comment:** `alter publication ... add table` is not guarded against a
 > table already being present in the publication. Reapplying the bootstrap can
@@ -527,9 +527,21 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 - Wrap publication membership changes in catalog checks.
 - Test applying migrations to an empty database and upgrading an existing one.
 
+**Fix**
+
+- Added `202608010000_baseline_schema.sql` so `./supabase/apply.sh` works on an
+  empty database as well as an existing one.
+- Publication membership goes through `junoguard_ensure_realtime`, which no-ops
+  when the publication is missing or the table is already a member.
+- `supabase/schema.sql` is a readable end-state snapshot only; docs point at
+  `apply.sh`.
+- `supabase/verify_migrations.sh` applies the chain twice on a temporary
+  Postgres and checks the catalog.
+
 **Verification**
 
-- Migration up is repeatable in CI and leaves the expected schema/RLS state.
+- Migration up is repeatable via `supabase/verify_migrations.sh` and leaves the
+  expected schema/RLS state.
 
 ## Test and audit log
 

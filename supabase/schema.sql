@@ -1,4 +1,11 @@
--- JunoGuard schema
+-- JunoGuard schema — readable snapshot of the intended end state.
+--
+-- Do not apply this file directly to a database. Schema evolution lives in
+-- supabase/migrations/ and is applied with:
+--
+--   DATABASE_URL=postgres://... ./supabase/apply.sh
+--
+-- That path is re-runnable on empty and already-migrated databases (JG-019).
 -- One action table for both lanes, which is what lets a single kill switch
 -- cover everything an agent can do.
 
@@ -170,11 +177,53 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Realtime — drives the live dashboard.
+-- Add each table only when the publication exists and the table is not
+-- already a member. Re-applying must not fail midway (JG-019).
 -- ---------------------------------------------------------------------------
 
-alter publication supabase_realtime add table agent_actions;
-alter publication supabase_realtime add table incidents;
-alter publication supabase_realtime add table projects;
+create or replace function public.junoguard_ensure_realtime(p_table regclass)
+returns void
+language plpgsql
+as $$
+declare
+    v_schema text;
+    v_name   text;
+begin
+    if not exists (
+        select 1 from pg_publication where pubname = 'supabase_realtime'
+    ) then
+        return;
+    end if;
+
+    select n.nspname, c.relname into v_schema, v_name
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+     where c.oid = p_table;
+
+    if exists (
+        select 1
+          from pg_publication_tables
+         where pubname = 'supabase_realtime'
+           and schemaname = v_schema
+           and tablename = v_name
+    ) then
+        return;
+    end if;
+
+    execute format(
+        'alter publication supabase_realtime add table %I.%I',
+        v_schema, v_name
+    );
+end
+$$;
+
+do $$
+begin
+    perform public.junoguard_ensure_realtime('public.agent_actions'::regclass);
+    perform public.junoguard_ensure_realtime('public.incidents'::regclass);
+    perform public.junoguard_ensure_realtime('public.projects'::regclass);
+end
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Membership predicates

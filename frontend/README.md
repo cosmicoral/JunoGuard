@@ -39,9 +39,12 @@ redirect allow list. Then copy `.env.example` to `.env.local` and set
 2. In Supabase Authentication → Providers, enable GitHub and add the OAuth
    app's client ID and client secret.
 
-Finally, apply `supabase/schema.sql` for a fresh database, or apply
-`supabase/migrations/202608010001_require_authenticated_dashboard_reads.sql`
-to an existing database so anonymous clients cannot read dashboard data.
+Finally, apply the ordered migrations (works on an empty database and is safe
+to re-run):
+
+```bash
+DATABASE_URL='postgres://…' ./supabase/apply.sh
+```
 
 The browser uses the PKCE OAuth flow. Supabase persists and refreshes the
 session, `/auth/callback` exchanges the authorization code, and unauthenticated

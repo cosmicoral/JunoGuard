@@ -287,10 +287,10 @@ uses it, and a `VITE_`-prefixed secret is published to every visitor.
 
 Committed to the repo, no console access required:
 
-- `supabase/schema.sql` applied to `izvcwrgfwobmmmtpubdi` — `projects`,
-  `policies`, `agent_actions`, `incidents`, the `daily_spend_usd` function,
-  RLS policies scoped to `authenticated`, the `supabase_realtime` publication,
-  and the `Demo Project` seed row.
+- Migrations under `supabase/migrations/` applied to `izvcwrgfwobmmmtpubdi`
+  via `supabase/apply.sh` — `projects`, `policies`, `agent_actions`,
+  `incidents`, membership/RLS, the `daily_spend_usd` function, the
+  `supabase_realtime` publication membership, and the optional demo seed.
 - `backend/.env` has `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, so the
   gateway writes to Supabase instead of memory. This file is gitignored and the
   service role key is not in any `VITE_` variable.
