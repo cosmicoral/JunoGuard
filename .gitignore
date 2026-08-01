@@ -17,3 +17,5 @@ dist/
 
 # Editors
 .vscode/
+# TS incremental build info
+*.tsbuildinfo

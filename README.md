@@ -209,11 +209,15 @@ uvicorn app.main:app --reload
 ```
 
 ```bash
-# Frontend
+# Frontend — runs on mock data with no backend and no credentials
 cd frontend
 npm install
 npm run dev
 ```
+
+The dashboard switches from mock data to Supabase Realtime as soon as
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are present. See
+[`frontend/README.md`](frontend/README.md) for the demo controls.
 
 Health check:
 

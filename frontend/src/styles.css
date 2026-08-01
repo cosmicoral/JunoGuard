@@ -1,0 +1,667 @@
+/* ==========================================================================
+   JunoGuard — dashboard
+   Tuned for a projector at ~960px wide. High contrast, no mid-greys carrying
+   meaning, numbers legible across a room.
+   ========================================================================== */
+
+:root {
+  --bg: #0a0c0e;
+  --panel: #14171a;
+  --panel-hi: #191d21;
+  --border: #232830;
+  --text: #e6e9ec;
+  --muted: #8a929c;
+
+  --allow: #3fb950;
+  --block: #f85149;
+  --flag: #d29922;
+  --juno: #e3b341;
+
+  --block-wash: rgba(248, 81, 73, 0.055);
+  --block-flash: rgba(248, 81, 73, 0.22);
+
+  --mono: "Berkeley Mono", "JetBrains Mono", ui-monospace, SFMono-Regular,
+    "SF Mono", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  --radius: 10px;
+  --gap: 10px;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  transition: background-color 320ms var(--ease-out);
+}
+
+body[data-suspended="true"] {
+  background: #0d0a0a;
+}
+
+/* --------------------------------------------------------------------------
+   Shell
+   -------------------------------------------------------------------------- */
+
+.app {
+  height: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-height: 0;
+}
+
+/* The rail is the first thing that changes on suspend — a red line across the
+   full width of the screen, above everything. */
+.rail {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--block);
+  box-shadow: 0 0 24px 2px rgba(248, 81, 73, 0.55);
+  transform-origin: 50% 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.flash {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(
+    120% 90% at 50% 0%,
+    rgba(248, 81, 73, 0.42),
+    rgba(248, 81, 73, 0.06) 70%
+  );
+  z-index: 30;
+  pointer-events: none;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  transition: border-color 300ms var(--ease-out), background-color 300ms var(--ease-out);
+}
+
+/* --------------------------------------------------------------------------
+   Header
+   -------------------------------------------------------------------------- */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px 12px 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.mark {
+  display: block;
+  flex: none;
+}
+
+.wordmark {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--juno);
+  line-height: 1;
+}
+
+.brand-rule {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+.project {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--allow);
+}
+
+.status[data-suspended="true"] {
+  color: var(--block);
+}
+
+.dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  opacity: 0.35;
+  animation: dot-pulse 2.4s var(--ease-out) infinite;
+}
+
+.status[data-suspended="true"] .dot::after {
+  animation-duration: 1.1s;
+}
+
+@keyframes dot-pulse {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+  70%,
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.spacer {
+  flex: 1;
+}
+
+.uptime {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+/* Kill switch ------------------------------------------------------------- */
+
+.kill {
+  appearance: none;
+  border: 1px solid rgba(248, 81, 73, 0.42);
+  background: rgba(248, 81, 73, 0.08);
+  color: var(--block);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  padding: 9px 16px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: transform 130ms var(--ease-out), background-color 160ms ease,
+    border-color 160ms ease, color 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kill:hover {
+    background: rgba(248, 81, 73, 0.16);
+    border-color: rgba(248, 81, 73, 0.7);
+  }
+}
+
+.kill:active {
+  transform: scale(0.97);
+}
+
+.kill:focus-visible {
+  outline: 2px solid var(--block);
+  outline-offset: 2px;
+}
+
+.kill[data-suspended="true"] {
+  border-color: rgba(230, 233, 236, 0.28);
+  background: rgba(230, 233, 236, 0.06);
+  color: var(--text);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kill[data-suspended="true"]:hover {
+    background: rgba(230, 233, 236, 0.12);
+    border-color: rgba(230, 233, 236, 0.45);
+  }
+}
+
+/* Suspended treatment: the whole chrome shifts, not just the pill. */
+.header[data-suspended="true"] {
+  background: rgba(248, 81, 73, 0.09);
+  border-color: rgba(248, 81, 73, 0.38);
+}
+
+.header[data-suspended="true"] .wordmark {
+  color: var(--block);
+}
+
+.header[data-suspended="true"] .project {
+  color: rgba(230, 233, 236, 0.75);
+}
+
+/* --------------------------------------------------------------------------
+   Stat tiles
+   -------------------------------------------------------------------------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gap);
+}
+
+.tile {
+  padding: 11px 13px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 98px;
+}
+
+.tile-label {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tile-value {
+  font-family: var(--sans);
+  font-size: 38px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.028em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  margin-top: 2px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.tile-value[data-tone="block"] {
+  color: var(--block);
+}
+.tile-value[data-tone="flag"] {
+  color: var(--flag);
+}
+.tile-value[data-tone="muted"] {
+  color: var(--muted);
+}
+
+.tile-unit {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.tile-foot {
+  margin-top: auto;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  /* Never wrap — a second line would change one tile's height and break the
+     baseline the row of numbers sits on. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tile-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tile-bottom .meter,
+.tile-bottom .spark,
+.tile-bottom .tile-foot {
+  margin-top: 0;
+}
+
+/* Budget meter ------------------------------------------------------------ */
+
+.meter {
+  margin-top: auto;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(230, 233, 236, 0.07);
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--allow);
+  transform-origin: 0 50%;
+}
+
+.meter-fill[data-tone="flag"] {
+  background: var(--flag);
+}
+.meter-fill[data-tone="block"] {
+  background: var(--block);
+}
+
+/* Sparkline --------------------------------------------------------------- */
+
+.spark {
+  margin-top: auto;
+  display: block;
+  width: 100%;
+  height: 30px;
+  overflow: visible;
+}
+
+.spark-bar {
+  transition: fill 200ms ease;
+}
+
+.spark-limit {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.55;
+}
+
+/* --------------------------------------------------------------------------
+   Feed
+   -------------------------------------------------------------------------- */
+
+.feed {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.feed-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+
+.feed-title {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.feed-mode {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.feed-count {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex: 1;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  /* Scroll edge, not a hard divider — the list fades where it meets the panel. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent 100%);
+}
+
+.feed-list::-webkit-scrollbar {
+  width: 8px;
+}
+.feed-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+/* Row --------------------------------------------------------------------- */
+
+.row {
+  border-left: 2px solid transparent;
+}
+
+.row[data-decision="block"] {
+  border-left-color: var(--block);
+}
+.row[data-decision="flag"] {
+  border-left-color: var(--flag);
+}
+
+.row-main {
+  display: grid;
+  grid-template-columns: 74px 16px 34px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 12px;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.row[data-expandable="true"] .row-main {
+  cursor: pointer;
+}
+
+.cell-time {
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+
+.cell-glyph {
+  font-size: 14px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.cell-lane {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.cell-target {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.005em;
+}
+
+/* Three fixed slots — tokens, cost, status word. Every row puts the same kind
+   of value in the same column, so allow and block rows stay in register. */
+.cell-meta {
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+  display: grid;
+  grid-template-columns: 64px 66px 124px;
+  gap: 10px;
+  text-align: right;
+}
+
+.cell-meta .cost {
+  color: rgba(230, 233, 236, 0.72);
+}
+
+.cell-decision {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: right;
+  min-width: 108px;
+  white-space: nowrap;
+}
+
+[data-tone="allow"] {
+  color: var(--allow);
+}
+[data-tone="flag"] {
+  color: var(--flag);
+}
+[data-tone="block"] {
+  color: var(--block);
+}
+
+.row[data-decision="allow"] .cell-decision {
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+/* Blast radius ------------------------------------------------------------ */
+
+.blast {
+  overflow: hidden;
+}
+
+.blast-inner {
+  margin: 2px 14px 10px 12px;
+  padding: 10px 13px 11px;
+  border-left: 2px solid rgba(248, 81, 73, 0.55);
+  background: rgba(248, 81, 73, 0.07);
+  border-radius: 0 7px 7px 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.blast-reason {
+  color: rgba(230, 233, 236, 0.9);
+  margin-bottom: 9px;
+  letter-spacing: -0.005em;
+}
+
+.blast-grid {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  row-gap: 4px;
+  column-gap: 12px;
+}
+
+.blast-key {
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  padding-top: 2px;
+}
+
+.blast-val {
+  color: var(--text);
+}
+
+.cred {
+  display: inline-block;
+  border: 1px solid rgba(248, 81, 73, 0.35);
+  background: rgba(248, 81, 73, 0.1);
+  color: #ff8b84;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin: 0 5px 4px 0;
+  font-size: 11.5px;
+}
+
+.blast-summary {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(248, 81, 73, 0.22);
+  color: var(--block);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-size: 13px;
+}
+
+.blast-hint {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion
+   -------------------------------------------------------------------------- */
+
+/* Gentler, not absent. Colour and opacity still carry meaning — only the
+   movement and the looping pulse go. */
+@media (prefers-reduced-motion: reduce) {
+  .dot::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  .rail {
+    box-shadow: none;
+  }
+
+  .kill {
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  }
+
+  .kill:active {
+    transform: none;
+  }
+}
