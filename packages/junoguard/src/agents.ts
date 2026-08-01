@@ -36,7 +36,7 @@ export interface AgentTarget {
   /** Extra fields this agent expects on each server entry. */
   extra?: Record<string, string>;
   /** Shown when a scope is unsupported, e.g. use the agent's own CLI. */
-  note?: (scope: Scope) => string | null;
+  note?: (scope: Scope, packageName: string) => string | null;
 }
 
 const home = homedir();
@@ -64,9 +64,9 @@ export const AGENTS: AgentTarget[] = [
     // ~/.claude.json is a large application state file. Writing it risks the
     // user's whole configuration, so user scope defers to Claude Code's CLI.
     path: (scope, cwd) => (scope === "project" ? join(cwd, ".mcp.json") : null),
-    note: (scope) =>
+    note: (scope, packageName) =>
       scope === "global"
-        ? "user scope: run  claude mcp add -s user junoguard -- npx -y junoguard mcp"
+        ? `user scope: run  claude mcp add -s user junoguard -- npx -y ${packageName} mcp`
         : null,
   },
   {
@@ -123,11 +123,14 @@ export function writeConfig(
   cwd: string,
   name: string,
   entry: ServerEntry,
-  options: { force?: boolean; dryRun?: boolean } = {},
+  options: { force?: boolean; dryRun?: boolean; packageName?: string } = {},
 ): WriteOutcome {
   const path = agent.path(scope, cwd);
   if (path === null) {
-    return { kind: "unsupported", note: agent.note?.(scope) ?? `${agent.label} has no ${scope} scope` };
+    const note =
+      agent.note?.(scope, options.packageName ?? "@heysalad/junoguard") ??
+      `${agent.label} has no ${scope} scope`;
+    return { kind: "unsupported", note };
   }
 
   const payload = { ...entry, ...(agent.extra ?? {}) };

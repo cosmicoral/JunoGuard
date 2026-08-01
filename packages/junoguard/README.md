@@ -1,4 +1,4 @@
-# junoguard
+# @heysalad/junoguard
 
 > Supervision for AI coding agents. Juno watches what your agent installs and what it spends, and stops it before damage lands.
 
@@ -14,14 +14,14 @@ JunoGuard is the something.
 No gateway, no account, no key — offline fixtures, no network at all:
 
 ```bash
-JUNO_MOCK=1 npx junoguard scan @ossprey/test-package
+JUNO_MOCK=1 npx @heysalad/junoguard scan @ossprey/test-package
 ```
 
 ## Then wire it into your agent
 
 ```bash
-npx junoguard init --mock     # offline, to see it working end to end
-npx junoguard init            # against your own gateway (see below)
+npx @heysalad/junoguard init --mock     # offline, to see it working end to end
+npx @heysalad/junoguard init            # against your own gateway (see below)
 ```
 
 That writes MCP config for every AI coding agent it finds on your machine.
@@ -78,16 +78,16 @@ An allow is one quiet line, because allows happen constantly:
 ## Connect it to your agent
 
 ```bash
-npx junoguard init              # detect installed agents, configure each
-npx junoguard init cursor       # or name them
-npx junoguard init --global     # user-level instead of project-level
-npx junoguard init --dry-run    # show what would change, write nothing
+npx @heysalad/junoguard init              # detect installed agents, configure each
+npx @heysalad/junoguard init cursor       # or name them
+npx @heysalad/junoguard init --global     # user-level instead of project-level
+npx @heysalad/junoguard init --dry-run    # show what would change, write nothing
 ```
 
 | Agent | Project scope | User scope |
 |---|---|---|
 | Cursor | `.cursor/mcp.json` | `~/.cursor/mcp.json` |
-| Claude Code | `.mcp.json` | `claude mcp add -s user junoguard -- npx -y junoguard mcp` |
+| Claude Code | `.mcp.json` | `claude mcp add -s user junoguard -- npx -y @heysalad/junoguard mcp` |
 | Codex | — | `~/.codex/config.toml` |
 | VS Code | `.vscode/mcp.json` | user `mcp.json` |
 | Windsurf | — | `~/.codeium/windsurf/mcp_config.json` |
@@ -105,7 +105,7 @@ Prefer to wire it yourself:
   "mcpServers": {
     "junoguard": {
       "command": "npx",
-      "args": ["-y", "junoguard", "mcp"]
+      "args": ["-y", "@heysalad/junoguard", "mcp"]
     }
   }
 }
@@ -127,7 +127,7 @@ expensive work, rather than discovering the limit by hitting it.
 ## The CLI
 
 ```bash
-npm i -g junoguard
+npm i -g @heysalad/junoguard
 ```
 
 ```bash
@@ -205,7 +205,7 @@ Then point this package at it:
 ```bash
 export JUNO_API_URL=http://localhost:8000
 export JUNO_PROJECT_KEY=<your project key>
-npx junoguard init
+npx @heysalad/junoguard init
 ```
 
 ### Offline mode

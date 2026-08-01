@@ -1,5 +1,5 @@
 {
-  "name": "junoguard",
+  "name": "@heysalad/junoguard",
   "version": "0.1.0",
   "description": "Supervision for AI coding agents — scan every package before it installs, cap what your agent spends. MCP server + CLI.",
   "keywords": [
@@ -14,6 +14,16 @@
   ],
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cosmicoral/TokenGuard.git",
+    "directory": "packages/junoguard"
+  },
+  "homepage": "https://github.com/cosmicoral/TokenGuard#readme",
+  "bugs": "https://github.com/cosmicoral/TokenGuard/issues",
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=18"
   },

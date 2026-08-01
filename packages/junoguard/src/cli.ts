@@ -239,7 +239,7 @@ async function cmdWatch(argv: string[]): Promise<number> {
   }
 }
 
-function cmdInit(argv: string[]): number {
+function cmdInit(argv: string[], packageName: string): number {
   const flags = parseFlags(argv);
   const scope: Scope = flags.bools.global ? "global" : "project";
   const cwd = process.cwd();
@@ -261,7 +261,7 @@ function cmdInit(argv: string[]): number {
     command: flags.bools.local ? process.execPath : "npx",
     args: flags.bools.local
       ? [new URL("./bin.js", import.meta.url).pathname, "mcp"]
-      : ["-y", "junoguard", "mcp"],
+      : ["-y", packageName, "mcp"],
     env,
   };
 
@@ -287,7 +287,11 @@ function cmdInit(argv: string[]): number {
 
   let failures = 0;
   for (const agent of requested) {
-    const result = writeConfig(agent, scope, cwd, "junoguard", entry, { force, dryRun });
+    const result = writeConfig(agent, scope, cwd, "junoguard", entry, {
+      force,
+      dryRun,
+      packageName,
+    });
     const name = agent.label.padEnd(13);
     switch (result.kind) {
       case "written":
@@ -403,7 +407,11 @@ ${pc.bold("EXIT CODES")}
   0 allowed · 2 blocked by policy · 3 guard unreachable · 4 not configured
 `.trim();
 
-export async function main(argv: string[], version: string): Promise<number> {
+export async function main(
+  argv: string[],
+  pkg: { name: string; version: string },
+): Promise<number> {
+  const { name: packageName, version } = pkg;
   const [command, ...rest] = argv;
 
   switch (command) {
@@ -429,7 +437,7 @@ export async function main(argv: string[], version: string): Promise<number> {
       return cmdWatch(rest);
 
     case "init":
-      return cmdInit(rest);
+      return cmdInit(rest, packageName);
 
     case "mcp": {
       // Imported lazily so the CLI path never pays for the MCP SDK.
