@@ -9,6 +9,7 @@ not permission to proceed.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import time
 
@@ -25,6 +26,9 @@ from .render import S_BLOCK, S_DIM, S_FLAG, render_error, render_install, render
 EXIT_OK = 0
 EXIT_BLOCKED = 2
 EXIT_UNAVAILABLE = 3
+# Distinct from a policy block: nothing was evaluated, so there is no verdict —
+# only the absence of one, which is still a refusal.
+EXIT_UNSCANNABLE = 5
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -129,23 +133,110 @@ def _split_tokens(tokens: list[str]) -> tuple[list[str], list[str]]:
     return packages, passthrough
 
 
+# Our own flags, stripped before anything reaches npm or pip.
+_OWN_FLAGS = {"--allow-unscanned", "--reason", "--operator"}
+
+
+def _extract_override(tokens: list[str]) -> tuple[list[str], dict[str, str | bool]]:
+    rest: list[str] = []
+    override: dict[str, str | bool] = {"allowed": False}
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token not in _OWN_FLAGS:
+            rest.append(token)
+        elif token == "--allow-unscanned":
+            override["allowed"] = True
+        else:
+            index += 1
+            if index < len(tokens):
+                override[token.lstrip("-")] = tokens[index]
+        index += 1
+    return rest, override
+
+
+def _refuse_unscannable(sources: list[str], manager: str, kind: str) -> typer.Exit:
+    """Refuse an install nobody can scan, and say what would authorize it.
+
+    Lockfile installs and path, URL or Git sources cannot be evaluated by name.
+    Running the package manager anyway with a warning above it was the gap that
+    made "an agent cannot route around the gate" untrue: an agent that reads the
+    warning still gets its package.
+    """
+    console.print()
+    console.print("JUNO · REFUSED — NOTHING TO SCAN", style=S_BLOCK)
+    console.print()
+    if kind == "lockfile":
+        console.print(f"No package was named, so {manager} would resolve from a lockfile.")
+    else:
+        console.print(f"These sources cannot be scanned by name: {', '.join(sources)}")
+    console.print(f"{manager} was not run.", style=S_BLOCK)
+    console.print()
+    console.print("An unscannable source needs a named human to take responsibility:", style=S_DIM)
+    console.print(
+        f'  juno {manager} install … --allow-unscanned --reason "<why>" --operator "<you>"'
+    )
+    console.print(
+        "The override is recorded against the project. If it cannot be recorded,\n"
+        "the install still does not happen.",
+        style=S_DIM,
+    )
+    return typer.Exit(EXIT_UNSCANNABLE)
+
+
+def _record_override(
+    sources: list[str], ecosystem: str, manager: str, override: dict[str, str | bool]
+) -> bool:
+    reason = override.get("reason")
+    operator = override.get("operator") or os.environ.get("JUNO_OPERATOR")
+    if not reason or not operator:
+        console.print("--allow-unscanned needs both --reason and --operator.", style=S_BLOCK)
+        console.print(
+            "  (--operator may come from the JUNO_OPERATOR environment variable.)", style=S_DIM
+        )
+        return False
+
+    client = JunoClient()
+    try:
+        payload = client.report_unscanned(
+            sources, ecosystem, manager, str(reason), str(operator)
+        )
+    except JunoUnavailable as exc:
+        # An unrecordable override is exactly what an attacker would want, so
+        # this fails closed rather than proceeding on trust.
+        console.print(f"The override could not be recorded: {exc.detail}", style=S_BLOCK)
+        console.print(
+            f"{manager} was not run. An unlogged override is not an override.", style=S_BLOCK
+        )
+        return False
+
+    console.print(f"override recorded — {payload.get('reason', 'logged')}", style=S_FLAG)
+    if client.mock:
+        console.print("JUNO_MOCK=1: nothing was actually recorded anywhere.", style=S_BLOCK)
+        return False
+    return True
+
+
 def _forward(ctx: typer.Context, ecosystem: str, argv: list[str], manager: str) -> None:
     # Read raw argv rather than typed arguments so flag order survives intact —
     # `--prefix ./here` must reach npm exactly as the user wrote it.
-    tokens = list(ctx.args)
+    tokens, override = _extract_override(list(ctx.args))
     packages, passthrough = _split_tokens(tokens)
+    unscanned = [t for t in passthrough if not t.startswith("-")]
 
-    if not packages:
-        # A lockfile install, or a path/URL install. Say the run was unguarded
-        # rather than implying Juno approved it.
-        console.print(f"no scannable package named — running {manager} unguarded", style=S_FLAG)
+    # No package named at all: a lockfile install, which resolves whatever the
+    # lockfile says and is therefore entirely unscanned.
+    if not packages and not unscanned:
+        if not override["allowed"]:
+            raise _refuse_unscannable([], manager, "lockfile")
+        if not _record_override([f"{manager} lockfile"], ecosystem, manager, override):
+            raise typer.Exit(EXIT_UNSCANNABLE)
         _exec([*argv, *tokens], manager)
 
-    unscanned = [t for t in passthrough if not t.startswith("-")]
-    if unscanned:
-        console.print(
-            f"not scanned (path or URL install): {', '.join(unscanned)}", style=S_FLAG
-        )
+    if unscanned and not override["allowed"]:
+        raise _refuse_unscannable(unscanned, manager, "sources")
+    if unscanned and not _record_override(unscanned, ecosystem, manager, override):
+        raise typer.Exit(EXIT_UNSCANNABLE)
 
     client = JunoClient()
     blocked = [p for p in packages if _scan_one(client, p, ecosystem, None) == "block"]

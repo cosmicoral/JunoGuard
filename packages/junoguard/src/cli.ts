@@ -41,6 +41,9 @@ const EXIT_OK = 0;
 const EXIT_BLOCKED = 2;
 const EXIT_UNAVAILABLE = 3;
 const EXIT_NOT_CONFIGURED = 4;
+// Distinct from a policy block: nothing was evaluated, so there is no verdict —
+// only an absence of one, which is still a refusal.
+const EXIT_UNSCANNABLE = 5;
 
 const PAINT: Record<Style, (value: string) => string> = {
   "": (value) => value,
@@ -143,25 +146,134 @@ async function cmdScan(argv: string[]): Promise<number> {
 // git/http installs. Scoped npm names like @scope/pkg must survive this.
 const UNSCANNABLE = /^(-|\.|\/|~|file:|git\+|git:|https?:)/;
 
+/** Our own flags, stripped before anything is handed to npm or pip. */
+const OWN_FLAGS = new Set(["--allow-unscanned", "--reason", "--operator"]);
+
+interface Override {
+  allowed: boolean;
+  reason?: string;
+  operator?: string;
+}
+
+function extractOverride(tokens: string[]): { rest: string[]; override: Override } {
+  const rest: string[] = [];
+  const override: Override = { allowed: false };
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i]!;
+    if (!OWN_FLAGS.has(token)) {
+      rest.push(token);
+      continue;
+    }
+    if (token === "--allow-unscanned") override.allowed = true;
+    if (token === "--reason") override.reason = tokens[++i];
+    if (token === "--operator") override.operator = tokens[++i];
+  }
+  return { rest, override };
+}
+
+/**
+ * Refuse an install nobody can scan, and say exactly what would authorize it.
+ *
+ * A lockfile-only install, a local archive, a Git or URL source: Juno cannot
+ * evaluate any of them by name. Running the package manager anyway with a
+ * warning printed above it was the gap that made "an agent cannot route around
+ * the gate" untrue — an agent that reads the warning still gets its package.
+ */
+function refuseUnscannable(
+  sources: string[],
+  manager: string,
+  kind: "lockfile" | "sources",
+): number {
+  err([
+    [["", ""]],
+    [[`JUNO · REFUSED — NOTHING TO SCAN`, "block"]],
+    [[``, ""]],
+    kind === "lockfile"
+      ? [[`No package was named, so ${manager} would resolve from a lockfile.`, ""]]
+      : [[`These sources cannot be scanned by name: ${sources.join(", ")}`, ""]],
+    [[`${manager} was not run.`, "block"]],
+    [[``, ""]],
+    [[`An unscannable source needs a named human to take responsibility:`, "dim"]],
+    [
+      [
+        `  juno ${manager} install … --allow-unscanned --reason "<why>" --operator "<you>"`,
+        "key",
+      ],
+    ],
+    [[`The override is recorded against the project as an audited gap in`, "dim"]],
+    [[`coverage. If it cannot be recorded, the install still does not happen.`, "dim"]],
+  ]);
+  return EXIT_UNSCANNABLE;
+}
+
+async function recordOverride(
+  sources: string[],
+  ecosystem: Ecosystem,
+  manager: string,
+  override: Override,
+): Promise<boolean> {
+  const operator = override.operator ?? process.env.JUNO_OPERATOR;
+  if (!override.reason || !operator) {
+    err([
+      [[`--allow-unscanned needs both --reason and --operator.`, "block"]],
+      [[`  (--operator may come from the JUNO_OPERATOR environment variable.)`, "dim"]],
+    ]);
+    return false;
+  }
+
+  const client = new JunoClient();
+  try {
+    const payload = await client.reportUnscanned({
+      sources,
+      ecosystem,
+      manager,
+      reason: override.reason,
+      operator,
+    });
+    say(`override recorded — ${payload.reason ?? "logged"}`, "flag");
+    if (client.mock) {
+      say("JUNO_MOCK=1: nothing was actually recorded anywhere.", "block");
+      return false;
+    }
+    return true;
+  } catch (error) {
+    // Unrecordable overrides are exactly what an attacker would want, so this
+    // fails closed rather than proceeding on trust.
+    const detail = error instanceof JunoUnavailable ? error.detail : String(error);
+    err([
+      [[`The override could not be recorded: ${detail}`, "block"]],
+      [[`${manager} was not run. An unlogged override is not an override.`, "block"]],
+    ]);
+    return false;
+  }
+}
+
 async function cmdForward(
   tokens: string[],
   ecosystem: Ecosystem,
   argv0: string[],
   manager: string,
 ): Promise<number> {
-  const packages = tokens.filter((token) => !UNSCANNABLE.test(token));
-  const passthrough = tokens.filter((token) => UNSCANNABLE.test(token));
+  const { rest, override } = extractOverride(tokens);
+  const packages = rest.filter((token) => !UNSCANNABLE.test(token));
+  const passthrough = rest.filter((token) => UNSCANNABLE.test(token));
+  const unscanned = passthrough.filter((token) => !token.startsWith("-"));
 
-  if (!packages.length) {
-    // A lockfile install, or a path/URL install. Say the run was unguarded
-    // rather than implying Juno approved it.
-    say(`no scannable package named — running ${manager} unguarded`, "flag");
-    return exec([...argv0, ...tokens], manager);
+  // No package named at all: a lockfile install, which resolves whatever the
+  // lockfile says and is therefore entirely unscanned.
+  if (!packages.length && !unscanned.length) {
+    if (!override.allowed) return refuseUnscannable([], manager, "lockfile");
+    if (!(await recordOverride([`${manager} lockfile`], ecosystem, manager, override))) {
+      return EXIT_UNSCANNABLE;
+    }
+    return exec([...argv0, ...rest], manager);
   }
 
-  const unscanned = passthrough.filter((token) => !token.startsWith("-"));
-  if (unscanned.length) {
-    say(`not scanned (path or URL install): ${unscanned.join(", ")}`, "flag");
+  if (unscanned.length && !override.allowed) {
+    return refuseUnscannable(unscanned, manager, "sources");
+  }
+  if (unscanned.length && !(await recordOverride(unscanned, ecosystem, manager, override))) {
+    return EXIT_UNSCANNABLE;
   }
 
   const client = new JunoClient();
@@ -179,7 +291,7 @@ async function cmdForward(
     return EXIT_BLOCKED;
   }
 
-  return exec([...argv0, ...tokens], manager);
+  return exec([...argv0, ...rest], manager);
 }
 
 function exec(cmd: string[], manager: string): Promise<number> {
@@ -394,6 +506,15 @@ ${pc.bold("SCAN")}
   --ecosystem, -e <npm|pypi>
   --package-version <version>
 
+${pc.bold("UNSCANNABLE INSTALLS")}
+  Lockfile installs and path, URL or Git sources cannot be scanned by name, so
+  they are refused. To take responsibility for one:
+  --allow-unscanned         proceed anyway
+  --reason "<why>"          required with --allow-unscanned
+  --operator "<you>"        required; or set JUNO_OPERATOR
+  The override is recorded against the project. If it cannot be recorded, the
+  install does not happen.
+
 ${pc.bold("ENVIRONMENT")}
   JUNO_PROJECT_KEY          ${pc.bold("required")} for live use — sent as X-Juno-Key
   JUNO_API_URL              gateway base URL (default ${DEFAULT_API_URL})
@@ -405,6 +526,7 @@ ${pc.bold("TRY IT WITHOUT A GATEWAY")}
 
 ${pc.bold("EXIT CODES")}
   0 allowed · 2 blocked by policy · 3 guard unreachable · 4 not configured
+  5 refused: nothing to scan
 `.trim();
 
 export async function main(

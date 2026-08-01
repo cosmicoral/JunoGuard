@@ -86,6 +86,32 @@ carries a retry contract rather than a proceedable flag.
 
 ---
 
+## `POST /v1/guard/unscanned`
+
+Records an operator's override for an install that **cannot** be scanned:
+lockfile resolutions, local archives, and direct Git or URL sources.
+
+Clients refuse these by default and do so locally — they have to, because this
+gateway may be unreachable and a guard that cannot be consulted is not
+permission to proceed. This endpoint exists so the exception a human makes is
+auditable. **If the override cannot be recorded here, the client must refuse**;
+an override nobody can find later is indistinguishable from no policy.
+
+```jsonc
+{
+  "sources": ["./vendor/thing.tgz"],
+  "ecosystem": "npm",
+  "manager": "npm",
+  "reason": "vendored tarball reviewed by hand",   // min 8 chars
+  "operator": "Peter Machona"
+}
+```
+
+Returns the decision envelope with `decision: "flag"`, `risk_level: "high"`, and
+raises an incident so the gap in coverage appears in review.
+
+---
+
 ## `POST /v1/guard/llm`
 
 Lane B. Proxied model call.

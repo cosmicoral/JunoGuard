@@ -10,7 +10,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { Ecosystem, InstallResult, LlmResult, StatusResult } from "./types.js";
+import type { Ecosystem, Envelope, InstallResult, LlmResult, StatusResult } from "./types.js";
 
 export const DEFAULT_API_URL = "http://localhost:8000";
 const DEFAULT_TIMEOUT_MS = 20_000;
@@ -123,6 +123,30 @@ export class JunoClient {
       model,
       max_output_tokens: maxOutputTokens,
     });
+  }
+
+  /**
+   * Record an operator's override for an install that cannot be scanned.
+   *
+   * Callers must treat a rejection here as a refusal to install. An override
+   * nobody can find in the audit trail later is indistinguishable from having no
+   * policy at all.
+   */
+  reportUnscanned(input: {
+    sources: string[];
+    ecosystem: Ecosystem;
+    manager: string;
+    reason: string;
+    operator: string;
+  }): Promise<Envelope> {
+    if (this.mock) {
+      return Promise.resolve({
+        decision: "flag",
+        reason: `[offline fixture] override by ${input.operator} was NOT recorded anywhere.`,
+        risk_level: "high",
+      });
+    }
+    return this.request<Envelope>("POST", "/v1/guard/unscanned", input);
   }
 
   status(): Promise<StatusResult> {

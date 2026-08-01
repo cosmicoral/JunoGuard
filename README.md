@@ -121,9 +121,15 @@ AI runs on the **cold path** only — Modal sandboxes and analyses packages that
 
 Every package the agent tries to install is intercepted **before** it reaches disk.
 
-- Pre-install interception over MCP — the agent cannot route around it
-- [Ossprey](https://ossprey.com) SBOM generation and malware verdict
-- Block on known-malicious, flag on unknown
+- Pre-install interception over MCP — **advisory**: it depends on the agent
+  calling the tool. An OS or package-manager boundary that an agent genuinely
+  cannot step around is not implemented. `juno npm install` closes the gap for
+  installs that go through it.
+- [Ossprey](https://ossprey.com) malware verdict
+- Block on known-malicious, and on unknown by default
+- Sources that cannot be scanned — lockfile installs, local archives, Git and
+  URL sources — are **refused**, not waved through. Proceeding takes a named
+  operator override, and the override is recorded as an audited gap in coverage.
 - **Structured refusal** returned to the agent — a machine-readable reason, so it self-corrects to a safe alternative instead of retrying blindly
 - Flagged packages detonated in a **Modal** sandbox for deeper analysis, off the hot path
 

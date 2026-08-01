@@ -33,7 +33,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-006 | P1 | FIXED | OAuth does not protect kill-switch operations; the browser ships an agent key |
 | JG-007 | P1 | FIXED | OAuth regression makes the default mock/offline dashboard unreachable |
 | JG-008 | P1 | FIXED | A configured live dashboard silently degrades to mock data |
-| JG-009 | P1 | OPEN | CLI and MCP enforcement can be bypassed by supported install paths |
+| JG-009 | P1 | FIXED | CLI and MCP enforcement can be bypassed by supported install paths |
 | JG-010 | P1 | OPEN | Package verdict cache can preserve a stale `latest` allow indefinitely |
 | JG-011 | P1 | FIXED | Realtime subscriptions are not project-scoped and can mix tenant data |
 | JG-012 | P1 | OPEN | Product claims include Modal, SBOM, and unbypassable enforcement that are not implemented |
@@ -292,7 +292,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-009 — Supported install paths bypass the guard
 
 **Priority:** P1 / High  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** MCP enforcement depends on agent compliance. The CLI runs
 > lockfile-only installs and local/Git/URL installs unguarded, so the product

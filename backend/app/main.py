@@ -100,6 +100,18 @@ class InstallRequest(BaseModel):
     version: str | None = None
 
 
+class UnscannedRequest(BaseModel):
+    """An operator's authorization for an install that cannot be scanned."""
+
+    sources: list[str] = Field(min_length=1, max_length=50)
+    ecosystem: Literal["npm", "pypi"] = "npm"
+    manager: str = Field(default="npm", max_length=32)
+    # Long enough to be an explanation rather than a keystroke to get past a
+    # prompt. "yes" is not a reason.
+    reason: str = Field(min_length=8, max_length=500)
+    operator: str = Field(min_length=1, max_length=120)
+
+
 class LLMRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=200_000)
     model: str = "gpt-4o"
@@ -227,6 +239,34 @@ def guard_install(
         body["retry_after_seconds"] = verdict.metadata.get("retry_after_seconds")
 
     return body
+
+
+@app.post("/v1/guard/unscanned")
+def guard_unscanned(
+    payload: UnscannedRequest, project: dict[str, Any] = Depends(current_project)
+) -> dict[str, Any]:
+    """Record an operator override for an install that could not be scanned.
+
+    Clients refuse unscannable sources on their own — they have to, since this
+    gateway may be down. This endpoint exists so that the exception a human makes
+    is auditable: if the override cannot be recorded here, the client refuses
+    rather than proceeding unlogged.
+    """
+    if project["status"] == "suspended":
+        verdict = risk.SUSPENDED
+    else:
+        verdict = risk.unscanned_override(
+            payload.sources, payload.reason, payload.operator, payload.manager
+        )
+
+    action_id = _persist(
+        project,
+        verdict,
+        action_type="package_install",
+        target=", ".join(payload.sources)[:200],
+    )
+    status = "suspended" if project["status"] == "suspended" else "active"
+    return _envelope(action_id, verdict, status)
 
 
 @app.post("/v1/guard/llm")

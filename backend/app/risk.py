@@ -119,6 +119,43 @@ def evaluate_install(
     )
 
 
+def unscanned_override(
+    sources: list[str], reason: str, operator: str, manager: str
+) -> Verdict:
+    """An install nobody could scan, proceeding on a named human's authority.
+
+    Lockfile resolutions, local archives, and direct Git or URL sources cannot be
+    scanned by name. Refusing them is the default and lives in the client, which
+    must fail closed even when this gateway is unreachable. What lands here is
+    the exception a person chose to make — recorded as a gap in coverage with
+    their name on it, because an override nobody can find later is indis-
+    tinguishable from no policy at all.
+    """
+    listed = ", ".join(sources[:5]) + ("…" if len(sources) > 5 else "")
+    evidence = {
+        "unscanned": True,
+        "sources": sources[:50],
+        "manager": manager,
+        "operator": operator,
+        "override_reason": reason,
+    }
+    return Verdict(
+        decision="flag",
+        reason=(
+            f"Unscanned install allowed by operator override. {operator} ran "
+            f"{manager} against sources Ossprey cannot evaluate ({listed}). "
+            f"Stated reason: {reason}"
+        ),
+        risk_level="high",
+        metadata=evidence,
+        incident={
+            "severity": "medium",
+            "title": f"Unscanned install allowed by override: {listed}",
+            "evidence": evidence,
+        },
+    )
+
+
 # --- Lane B: tokens and cost ------------------------------------------------
 
 

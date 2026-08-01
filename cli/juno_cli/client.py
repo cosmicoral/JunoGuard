@@ -97,6 +97,37 @@ class JunoClient:
             {"prompt": prompt, "model": model, "max_output_tokens": max_output_tokens},
         )
 
+    def report_unscanned(
+        self,
+        sources: list[str],
+        ecosystem: str,
+        manager: str,
+        reason: str,
+        operator: str,
+    ) -> dict:
+        """Record an operator's override for an install that cannot be scanned.
+
+        Callers must treat a failure here as a refusal to install: an override
+        nobody can find in the audit trail is indistinguishable from no policy.
+        """
+        if self.mock:
+            return {
+                "decision": "flag",
+                "reason": f"[offline fixture] override by {operator} was NOT recorded anywhere.",
+                "risk_level": "high",
+            }
+        return self._request(
+            "POST",
+            "/v1/guard/unscanned",
+            {
+                "sources": sources,
+                "ecosystem": ecosystem,
+                "manager": manager,
+                "reason": reason,
+                "operator": operator,
+            },
+        )
+
     def status(self) -> dict:
         if self.mock:
             return mock_status()

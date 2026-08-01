@@ -25,7 +25,19 @@ npx @heysalad/junoguard init            # against your own gateway (see below)
 ```
 
 That writes MCP config for every AI coding agent it finds on your machine.
-From then on, every package your agent tries to install is checked first.
+From then on, every package your agent tries to install **through Juno** is
+checked first.
+
+> **MCP enforcement is advisory.** It works by the agent choosing to call the
+> tool. Nothing at the OS or package-manager level stops an agent that shells out
+> to `npm install` directly, and this package does not claim otherwise. Use
+> `juno npm install` / `juno pip install` in scripts and CI where you control the
+> command, and treat the MCP server as policy the agent is asked to respect
+> rather than a boundary it cannot cross.
+>
+> Where Juno *is* consulted it fails closed: an unreachable gateway, an
+> unavailable scanner, or a source that cannot be scanned at all all end with the
+> package manager not running.
 
 > **This package is a client.** It renders decisions; it does not make them.
 > Live use needs a JunoGuard gateway — yours, self-hosted — and a project key.
