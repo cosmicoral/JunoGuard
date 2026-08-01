@@ -128,10 +128,8 @@ export function Landing() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65, ease: [0.23, 1, 0.32, 1] }}
         >
-          <p className="hero-brand">
-            <BrandMark />
-            <span>JUNOGUARD</span>
-          </p>
+          {/* No lockup here — the nav carries the brand 40px above it, and
+              repeating it just pushes the headline down the fold. */}
           <h1>The control plane between your agent and the blast radius.</h1>
           <p className="hero-lede">
             Every install, model call, and policy breach — decided before it
