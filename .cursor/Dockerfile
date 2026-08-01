@@ -28,6 +28,5 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m pip install --break-system-packages --upgrade pip setuptools wheel
-
+# Use the distro pip as-is. Upgrading Debian's pip fails (no RECORD file).
 WORKDIR /workspace
