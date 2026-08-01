@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { SYSTEM_MARKS } from "./components/SystemMarks";
 
 const PACKAGE = "@heysalad/junoguard";
 const NPM_URL = "https://www.npmjs.com/package/@heysalad/junoguard";
@@ -163,7 +164,12 @@ export function Landing() {
       <div className="system-strip" aria-label="JunoGuard integrations">
         <span>BUILT FOR</span>
         <div>
-          <b>MCP</b><b>CURSOR</b><b>CLAUDE CODE</b><b>CODEX</b><b>OSSPREY</b><b>SUPABASE</b><b>MODAL</b>
+          {SYSTEM_MARKS.map(({ label, Mark }) => (
+            <span className="system-mark" key={label}>
+              <Mark />
+              <b>{label}</b>
+            </span>
+          ))}
         </div>
       </div>
 

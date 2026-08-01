@@ -1339,7 +1339,36 @@ body[data-suspended="true"] {
   font-size: 10px;
 }
 
-.system-strip b { font-weight: 500; }
+/* Icon leads, word demoted to a caption. The glyph is what you scan; the
+   label is what stops MCP and Ossprey from being a guess. */
+.system-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #cfcdc6;
+  transition: color 180ms var(--ease-out);
+}
+
+.system-mark svg {
+  width: 21px;
+  height: 21px;
+  flex: none;
+}
+
+.system-strip b {
+  font-weight: 500;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8d8c86;
+  white-space: nowrap;
+  transition: color 180ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .system-mark:hover { color: var(--landing-gold); }
+  .system-mark:hover b { color: #cfcdc6; }
+}
 
 .thesis-section,
 .gate-section,
@@ -1645,7 +1674,9 @@ body[data-suspended="true"] {
   .console-row { grid-template-columns: 42px 32px minmax(0, 1fr) 42px; padding: 0 10px; gap: 6px; font-size: 8px; }
   .blast-preview { margin: 9px; }
   .system-strip { grid-template-columns: 1fr; padding: 18px; gap: 14px; }
-  .system-strip > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .system-strip > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 10px; }
+  .system-mark { gap: 7px; }
+  .system-mark svg { width: 18px; height: 18px; }
   .thesis-section, .gate-section, .architecture-section { padding: 90px 0; }
   .thesis-section h2, .gate-intro h2, .architecture-head h2 { font-size: 3.3rem; }
   .gate-intro { margin-bottom: 46px; }
