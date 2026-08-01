@@ -42,7 +42,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-015 | P2 | FIXED | Critical suspend/resume actions lack actor, role, reason, and audit history |
 | JG-016 | P2 | FIXED | Production deployment is blocked by localhost-only CORS and missing hosting config |
 | JG-017 | P2 | FIXED | Frontend toolchain has known high/moderate development-server vulnerabilities |
-| JG-018 | P2 | OPEN | Python dependencies are unpinned and builds are not reproducible |
+| JG-018 | P2 | FIXED | Python dependencies are unpinned and builds are not reproducible |
 | JG-019 | P2 | FIXED | Supabase bootstrap SQL is not safely rerunnable |
 
 ## Confirmed findings
@@ -502,8 +502,8 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 
 ### JG-018 — Python dependency resolution is not reproducible
 
-**Priority:** P2 / Medium  
-**Status:** OPEN
+**Priority:** P2 / Medium
+**Status:** FIXED
 
 > **Review comment:** Backend requirements are unpinned and CLI/MCP manifests
 > specify lower bounds without lockfiles. A future install can silently select
@@ -514,6 +514,16 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 - Generate reviewed lock/constraints files for each Python deliverable.
 - Pin the supported Python version.
 - Run dependency audit and tests on scheduled updates.
+
+**Fix**
+
+- Added `.python-version` pinning supported Python to 3.12.
+- Backend: `requirements.in` plus a hashed `requirements.txt` from
+  `uv pip compile --generate-hashes`; Dockerfile installs with
+  `--require-hashes` only (no unpinned fallback).
+- CLI and MCP: exact dependency pins in `pyproject.toml` (`requires-python`
+  `>=3.12,<3.13`) and matching hashed `requirements.txt` lockfiles.
+- `pip-audit` on the backend lock reported no known vulnerabilities.
 
 **Verification**
 

@@ -14,9 +14,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /srv
 
 # Dependencies first: this layer is cached until requirements change.
+# requirements.txt is a hashed lock (see requirements.in); refuse anything else.
 COPY requirements.txt ./
-RUN pip install --require-hashes --no-deps -r requirements.txt \
-    || pip install -r requirements.txt
+RUN pip install --require-hashes -r requirements.txt
 
 COPY app ./app
 

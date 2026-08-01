@@ -1,0 +1,15 @@
+# Direct dependencies for the JunoGuard gateway.
+# Supported Python: 3.12 (see /.python-version).
+# Refresh the hashed lock with:
+#   uv pip compile --python-version 3.12 --generate-hashes \
+#     requirements.in -o requirements.txt
+#
+# Install exactly what was reviewed:
+#   pip install --require-hashes -r requirements.txt
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+python-dotenv==1.2.2
+httpx==0.28.1
+pydantic==2.13.4
+pytest==9.1.1
