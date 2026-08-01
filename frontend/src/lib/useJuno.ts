@@ -96,6 +96,7 @@ export interface JunoState {
   source: typeof dataSource;
   freshIds: Set<string>;
   killError: string | null;
+  accessError: string | null;
   toggleSuspend: () => void;
 }
 
@@ -116,6 +117,9 @@ export function useJuno(): JunoState {
   const [suspendedAt, setSuspendedAt] = useState<number | null>(null);
   const [killError, setKillError] = useState<string | null>(null);
   const [killing, setKilling] = useState(false);
+  // Set when the signed-in account has no readable project. Better to say so
+  // than to render a dashboard of zeroes that looks like a quiet system.
+  const [accessError, setAccessError] = useState<string | null>(null);
   // Set when the gateway is configured but unreachable. An empty dashboard is
   // the one outcome the demo cannot survive, so we drop back to mock traffic
   // and say so in the feed badge rather than showing a blank screen.
@@ -189,13 +193,38 @@ export function useJuno(): JunoState {
     let cancelled = false;
 
     (async () => {
+      // Membership decides which project this dashboard shows. Ordering the
+      // projects table and taking the first row was how one user could land on
+      // another tenant's project.
+      const { data: memberships, error: membershipError } = await supabase
+        .from("project_members")
+        .select("project_id")
+        .order("created_at", { ascending: true })
+        .limit(1);
+      if (cancelled) return;
+      if (membershipError) {
+        setAccessError(membershipError.message);
+        return;
+      }
+      const membership = memberships?.[0] as { project_id: string } | undefined;
+      if (!membership) {
+        setAccessError(
+          "This account is not a member of any JunoGuard project. Ask an owner to add you.",
+        );
+        return;
+      }
+
       const { data: projects } = await supabase
         .from("projects")
         .select("id, name, status")
-        .order("created_at", { ascending: true })
+        .eq("id", membership.project_id)
         .limit(1);
       const p = projects?.[0] as Project | undefined;
-      if (!p || cancelled) return;
+      if (!p || cancelled) {
+        if (!cancelled) setAccessError("That project is no longer readable with this account.");
+        return;
+      }
+      setAccessError(null);
       setProject(p);
       projectIdRef.current = p.id;
 
@@ -460,6 +489,7 @@ export function useJuno(): JunoState {
     source,
     freshIds: freshIds.current,
     killError,
+    accessError,
     toggleSuspend,
   };
 }

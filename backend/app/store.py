@@ -6,6 +6,8 @@ in-memory otherwise. The gateway boots and the demo runs either way.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import threading
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -24,6 +26,41 @@ def _iso(dt: datetime) -> str:
     return dt.isoformat()
 
 
+# --- agent keys -------------------------------------------------------------
+#
+# The key itself is never stored, and never leaves the client that holds it.
+# Lookups hash the presented key and match on the hash, so a database dump
+# cannot be replayed against the gateway.
+
+
+def key_hash(api_key: str) -> str:
+    return hashlib.sha256(api_key.strip().encode("utf-8")).hexdigest()
+
+
+def key_prefix(api_key: str) -> str:
+    """Enough to identify which key is in use, not enough to use it."""
+    return api_key.strip()[:12]
+
+
+# Columns any caller may see. Deliberately excludes api_key_hash: a hash is
+# still a credential-shaped secret, and nothing outside the store needs it.
+PUBLIC_PROJECT_FIELDS = (
+    "id",
+    "name",
+    "status",
+    "suspended_at",
+    "suspended_reason",
+    "api_key_prefix",
+)
+
+PROJECT_SELECT = ",".join(PUBLIC_PROJECT_FIELDS)
+
+
+def public_project(project: dict[str, Any]) -> dict[str, Any]:
+    """The project as an API response is allowed to describe it."""
+    return {field: project.get(field) for field in PUBLIC_PROJECT_FIELDS}
+
+
 class MemoryStore:
     """Fallback store. Everything lives in one process and dies with it."""
 
@@ -32,8 +69,10 @@ class MemoryStore:
         self.project = {
             "id": str(uuid.uuid4()),
             "name": "Demo Project",
-            "api_key": config.DEMO_PROJECT_KEY,
+            "api_key_hash": key_hash(config.DEMO_PROJECT_KEY),
+            "api_key_prefix": key_prefix(config.DEMO_PROJECT_KEY),
             "status": "active",
+            "suspended_at": None,
             "suspended_reason": None,
         }
         self.policy = dict(config.DEFAULT_POLICY)
@@ -43,7 +82,10 @@ class MemoryStore:
     # --- projects -----------------------------------------------------------
 
     def get_project(self, api_key: str) -> dict[str, Any] | None:
-        return self.project if api_key == self.project["api_key"] else None
+        if not api_key:
+            return None
+        matched = hmac.compare_digest(key_hash(api_key), self.project["api_key_hash"])
+        return self.project if matched else None
 
     def get_policy(self, project_id: str) -> dict[str, Any]:
         return self.policy
@@ -52,6 +94,7 @@ class MemoryStore:
         with self._lock:
             self.project["status"] = status
             self.project["suspended_reason"] = reason
+            self.project["suspended_at"] = _iso(_now()) if status == "suspended" else None
         return self.project
 
     # --- actions ------------------------------------------------------------
@@ -128,7 +171,15 @@ class SupabaseStore:
     # --- projects -----------------------------------------------------------
 
     def get_project(self, api_key: str) -> dict[str, Any] | None:
-        rows = self._get("/projects", api_key=f"eq.{api_key}", select="*", limit=1)
+        if not api_key:
+            return None
+        rows = self._get(
+            "/projects",
+            api_key_hash=f"eq.{key_hash(api_key)}",
+            key_revoked_at="is.null",
+            select=PROJECT_SELECT,
+            limit=1,
+        )
         return rows[0] if rows else None
 
     def get_policy(self, project_id: str) -> dict[str, Any]:
@@ -150,7 +201,9 @@ class SupabaseStore:
         payload["suspended_at"] = _iso(_now()) if status == "suspended" else None
         r = self._client.patch(
             "/projects",
-            params={"id": f"eq.{project_id}"},
+            # Ask for the public columns only, so no caller can leak the key
+            # hash by forwarding whatever the store handed back.
+            params={"id": f"eq.{project_id}", "select": PROJECT_SELECT},
             json=payload,
             headers={"Prefer": "return=representation"},
         )

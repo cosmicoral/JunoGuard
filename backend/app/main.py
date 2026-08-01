@@ -16,7 +16,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import config, demo, events, pricing, provider, risk
-from .store import store
+from .store import public_project, store
 
 app = FastAPI(title="JunoGuard API", version="0.2.0")
 
@@ -246,14 +246,16 @@ def suspend(
     """The kill switch. Both lanes go dark until this is manually reversed."""
     updated = store.set_status(project["id"], "suspended", payload.reason)
     events.publish("project", {"status": "suspended", "reason": payload.reason})
-    return updated
+    # The persistence row carries the agent key hash. Responses carry the
+    # public view of a project and nothing else.
+    return public_project(updated)
 
 
 @app.post("/v1/projects/resume")
 def resume(project: dict[str, Any] = Depends(current_project)) -> dict[str, Any]:
     updated = store.set_status(project["id"], "active", None)
     events.publish("project", {"status": "active", "reason": None})
-    return updated
+    return public_project(updated)
 
 
 # --- live feed --------------------------------------------------------------

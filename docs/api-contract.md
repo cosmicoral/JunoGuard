@@ -128,8 +128,21 @@ The kill switch. Used by the dashboard.
 { "reason": "Manual suspend from dashboard" }
 ```
 
-Returns the updated project. While suspended, **both lanes** return
-`decision: "block"` with `reason: "Project suspended"`.
+Returns the **public project view** — never the agent key or its hash:
+
+```jsonc
+{
+  "id": "uuid",
+  "name": "Demo Project",
+  "status": "suspended",
+  "suspended_at": "2026-08-01T14:22:07Z",
+  "suspended_reason": "Manual suspend from dashboard",
+  "api_key_prefix": "jg_demo_key"
+}
+```
+
+While suspended, **both lanes** return `decision: "block"` with
+`reason: "Project suspended"`.
 
 ---
 

@@ -231,6 +231,25 @@ body[data-suspended="true"] {
   text-overflow: ellipsis;
 }
 
+/* No readable project for this account. Says so instead of showing zeroes. */
+.access-notice {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--flag);
+  border: 1px solid color-mix(in srgb, var(--flag) 40%, transparent);
+  background: color-mix(in srgb, var(--flag) 8%, transparent);
+  border-radius: 4px;
+  padding: 12px 14px;
+  letter-spacing: 0.02em;
+}
+
+.access-notice strong {
+  display: block;
+  margin-bottom: 4px;
+  letter-spacing: 0.08em;
+}
+
 .account {
   display: flex;
   align-items: center;

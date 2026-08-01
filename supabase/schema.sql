@@ -8,16 +8,39 @@ create extension if not exists "pgcrypto";
 -- projects
 -- ---------------------------------------------------------------------------
 
+-- The agent key is never stored. Only its SHA-256 hash (looked up on every
+-- guarded call) and a short prefix for identifying a key in the dashboard.
 create table if not exists projects (
     id          uuid primary key default gen_random_uuid(),
     name        text not null,
-    api_key     text not null unique,
+    api_key_hash    text not null unique,
+    api_key_prefix  text not null,
+    key_rotated_at  timestamptz,
+    key_revoked_at  timestamptz,
     status      text not null default 'active'
                 check (status in ('active', 'suspended')),
     suspended_at    timestamptz,
     suspended_reason text,
     created_at  timestamptz not null default now()
 );
+
+-- ---------------------------------------------------------------------------
+-- project_members
+-- Authorization for every browser read. Roles are ordered:
+-- viewer < operator < owner.
+-- ---------------------------------------------------------------------------
+
+create table if not exists project_members (
+    project_id  uuid not null references projects(id) on delete cascade,
+    user_id     uuid not null references auth.users(id) on delete cascade,
+    role        text not null default 'viewer'
+                check (role in ('viewer', 'operator', 'owner')),
+    created_at  timestamptz not null default now(),
+    primary key (project_id, user_id)
+);
+
+create index if not exists project_members_user_idx
+    on project_members (user_id);
 
 -- ---------------------------------------------------------------------------
 -- policies
@@ -123,45 +146,122 @@ alter publication supabase_realtime add table incidents;
 alter publication supabase_realtime add table projects;
 
 -- ---------------------------------------------------------------------------
+-- Membership predicates
+-- security definer so a policy on agent_actions does not itself have to
+-- satisfy project_members' RLS to answer "is this row mine?".
+-- ---------------------------------------------------------------------------
+
+create or replace function project_role(p_project_id uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+    select m.role
+      from project_members m
+     where m.project_id = p_project_id
+       and m.user_id = (select auth.uid())
+     limit 1;
+$$;
+
+create or replace function is_project_member(p_project_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+    select project_role(p_project_id) is not null;
+$$;
+
+revoke all on function project_role(uuid) from public;
+revoke all on function is_project_member(uuid) from public;
+grant execute on function project_role(uuid) to authenticated;
+grant execute on function is_project_member(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- RLS
 -- The gateway uses the service role and bypasses these. The browser client
--- carries the signed-in user's JWT, so dashboard reads require auth.uid().
+-- carries the signed-in user's JWT, and reads are scoped to the projects that
+-- user is a member of — being signed in is not itself authorization.
 -- Writes remain closed: nothing but Juno may record a decision.
 -- ---------------------------------------------------------------------------
 
-alter table projects      enable row level security;
-alter table policies      enable row level security;
-alter table agent_actions enable row level security;
-alter table incidents     enable row level security;
+alter table projects        enable row level security;
+alter table project_members enable row level security;
+alter table policies       enable row level security;
+alter table agent_actions  enable row level security;
+alter table incidents      enable row level security;
+
+drop policy if exists "members read own memberships" on project_members;
+create policy "members read own memberships"
+    on project_members for select to authenticated
+    using (user_id = (select auth.uid()));
 
 drop policy if exists "dashboard reads projects" on projects;
 create policy "dashboard reads projects"
     on projects for select to authenticated
-    using ((select auth.uid()) is not null);
+    using (is_project_member(id));
 
 drop policy if exists "dashboard reads policies" on policies;
 create policy "dashboard reads policies"
     on policies for select to authenticated
-    using ((select auth.uid()) is not null);
+    using (is_project_member(project_id));
 
 drop policy if exists "dashboard reads actions" on agent_actions;
 create policy "dashboard reads actions"
     on agent_actions for select to authenticated
-    using ((select auth.uid()) is not null);
+    using (is_project_member(project_id));
 
 drop policy if exists "dashboard reads incidents" on incidents;
 create policy "dashboard reads incidents"
     on incidents for select to authenticated
-    using ((select auth.uid()) is not null);
+    using (is_project_member(project_id));
+
+-- ---------------------------------------------------------------------------
+-- Column privileges
+-- RLS filters rows; this is what keeps the key hash out of a `select *`.
+-- ---------------------------------------------------------------------------
+
+revoke all on projects from anon;
+revoke all on projects from authenticated;
+grant select (id, name, status, suspended_at, suspended_reason, created_at,
+              api_key_prefix, key_rotated_at, key_revoked_at)
+    on projects to authenticated;
+
+revoke all on project_members from anon;
+grant select on project_members to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Demo seed
+-- No key is baked in. Supply one for the session and only its hash is stored:
+--   select set_config('junoguard.demo_project_key', 'jg_local_yourkey', false);
+-- Then grant yourself access:
+--   insert into project_members (project_id, user_id, role)
+--   values ('<project id>', '<your auth.users id>', 'owner');
 -- ---------------------------------------------------------------------------
 
-insert into projects (name, api_key, status)
-values ('Demo Project', 'jg_demo_key_cursorhack2026', 'active')
-on conflict (api_key) do nothing;
+do $$
+declare
+    demo_key text := nullif(current_setting('junoguard.demo_project_key', true), '');
+    demo_id  uuid;
+begin
+    if demo_key is null then
+        return;
+    end if;
 
-insert into policies (project_id)
-select id from projects where api_key = 'jg_demo_key_cursorhack2026'
-on conflict (project_id) do nothing;
+    insert into projects (name, api_key_hash, api_key_prefix, status)
+    values ('Demo Project', encode(digest(demo_key, 'sha256'), 'hex'),
+            left(demo_key, 12), 'active')
+    on conflict (api_key_hash) do nothing;
+
+    select id into demo_id
+      from projects
+     where api_key_hash = encode(digest(demo_key, 'sha256'), 'hex');
+
+    insert into policies (project_id)
+    values (demo_id)
+    on conflict (project_id) do nothing;
+end
+$$;

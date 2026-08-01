@@ -91,6 +91,13 @@ export function Dashboard() {
           onToggleSuspend={juno.toggleSuspend}
         />
 
+        {juno.accessError && (
+          <p className="access-notice" role="status">
+            <strong>NO PROJECT ACCESS</strong>
+            {juno.accessError}
+          </p>
+        )}
+
         <Stats
           actions={juno.actions}
           incidents={juno.incidents}
