@@ -88,6 +88,30 @@ STREAM_TOKEN_SECRET = os.getenv("STREAM_TOKEN_SECRET", "")
 
 OPERATOR_TOKEN = os.getenv("OPERATOR_TOKEN", "")
 
+# --- deployment -------------------------------------------------------------
+
+# "development" or "production". Production refuses to look ready while it is
+# running on degraded infrastructure, rather than serving happily from a store
+# that dies with the process.
+JUNO_ENV = os.getenv("JUNO_ENV", "development").strip().lower()
+IS_PRODUCTION = JUNO_ENV == "production"
+
+
+def _origins(name: str) -> list[str]:
+    raw = os.getenv(name, "")
+    return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+
+
+# Browser origins allowed to call this gateway. A production frontend has to be
+# named here; there is no wildcard, and no pattern that a deployed origin
+# accidentally matches.
+ALLOWED_ORIGINS = _origins("ALLOWED_ORIGINS")
+
+# Any localhost port, for development. Vite moves to 5174+ when 5173 is taken
+# and a CORS rejection there is invisible in the UI. Not reachable from another
+# machine, so it costs nothing to leave on — but it can be turned off.
+ALLOW_LOCALHOST_ORIGINS = _bool("ALLOW_LOCALHOST_ORIGINS", not IS_PRODUCTION)
+
 
 def mode() -> str:
     """Reported by /health so the demo operator knows what is live."""

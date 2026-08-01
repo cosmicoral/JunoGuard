@@ -11,7 +11,7 @@ import json
 import time
 from typing import Any, AsyncIterator, Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -24,10 +24,14 @@ app = FastAPI(title="JunoGuard API", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
-    # Any localhost port, not just 5173. Vite silently moves to 5174+ when the
-    # default is taken, and a CORS rejection there is invisible in the UI — it
-    # just renders an empty dashboard, which is the one thing the demo cannot do.
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    # A deployed frontend origin has to be named in ALLOWED_ORIGINS. Localhost
+    # stays matched by pattern for development — Vite silently moves to 5174+
+    # when the default is taken, and a CORS rejection there is invisible in the
+    # UI — but that pattern is off by default in production.
+    allow_origins=config.ALLOWED_ORIGINS,
+    allow_origin_regex=(
+        r"http://(localhost|127\.0\.0\.1)(:\d+)?" if config.ALLOW_LOCALHOST_ORIGINS else None
+    ),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -238,7 +242,52 @@ def _envelope(action_id: str, verdict: risk.Verdict, status: str) -> dict[str, A
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"status": "ok", "service": "JunoGuard", "mode": config.mode()}
+    """Liveness. Says what is real, so nobody has to guess from the outside."""
+    return {
+        "status": "ok",
+        "service": "JunoGuard",
+        "mode": config.mode(),
+        "environment": config.JUNO_ENV,
+        "store": "supabase" if isinstance(store, store_module.SupabaseStore) else "memory",
+        "scanner": "ossprey" if config.USE_OSSPREY else "mock",
+        "provider": "mock" if config.MOCK_PROVIDER or not config.PROVIDER_API_KEY else "live",
+    }
+
+
+@app.get("/ready")
+def ready(response: Response) -> dict[str, Any]:
+    """Readiness. In production, degraded infrastructure is not ready.
+
+    The gateway is deliberately able to boot with nothing configured — that is
+    what makes the demo survive a missing credential. The same property in
+    production would mean serving policy decisions from a store that dies with
+    the process, and reporting 200 while doing it.
+    """
+    problems: list[str] = []
+
+    if config.IS_PRODUCTION:
+        if not isinstance(store, store_module.SupabaseStore):
+            problems.append(
+                "persistence is the in-memory store: decisions, incidents and "
+                "control history would not survive a restart"
+            )
+        if not config.USE_OSSPREY:
+            problems.append("no Ossprey credentials: package verdicts would be mock fixtures")
+        if not config.ALLOWED_ORIGINS:
+            problems.append("ALLOWED_ORIGINS is empty: no browser origin can reach this gateway")
+        if not config.STREAM_TOKEN_SECRET:
+            problems.append(
+                "STREAM_TOKEN_SECRET is unset: event-stream tokens would not survive a "
+                "restart or work across replicas"
+            )
+        if not (config.OPERATOR_TOKEN or config.USE_SUPABASE):
+            problems.append("no operator identity is possible: the kill switch is unusable")
+
+    if problems:
+        response.status_code = 503
+        return {"status": "degraded", "problems": problems}
+
+    return {"status": "ready", "environment": config.JUNO_ENV}
 
 
 @app.post("/v1/guard/install")

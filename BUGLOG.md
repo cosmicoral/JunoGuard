@@ -40,7 +40,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-013 | P1 | OPEN | No project-owned automated tests protect security invariants |
 | JG-014 | P2 | FIXED | Provider failures produce no action or audit event |
 | JG-015 | P2 | FIXED | Critical suspend/resume actions lack actor, role, reason, and audit history |
-| JG-016 | P2 | OPEN | Production deployment is blocked by localhost-only CORS and missing hosting config |
+| JG-016 | P2 | FIXED | Production deployment is blocked by localhost-only CORS and missing hosting config |
 | JG-017 | P2 | OPEN | Frontend toolchain has known high/moderate development-server vulnerabilities |
 | JG-018 | P2 | OPEN | Python dependencies are unpinned and builds are not reproducible |
 | JG-019 | P2 | OPEN | Supabase bootstrap SQL is not safely rerunnable |
@@ -451,7 +451,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-016 — Production deployment path is incomplete
 
 **Priority:** P2 / Medium  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** Gateway CORS allows only localhost, no hosting/container
 > configuration is present, and in-memory state/event delivery is tied to one
