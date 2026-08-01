@@ -41,7 +41,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-014 | P2 | FIXED | Provider failures produce no action or audit event |
 | JG-015 | P2 | FIXED | Critical suspend/resume actions lack actor, role, reason, and audit history |
 | JG-016 | P2 | FIXED | Production deployment is blocked by localhost-only CORS and missing hosting config |
-| JG-017 | P2 | OPEN | Frontend toolchain has known high/moderate development-server vulnerabilities |
+| JG-017 | P2 | FIXED | Frontend toolchain has known high/moderate development-server vulnerabilities |
 | JG-018 | P2 | OPEN | Python dependencies are unpinned and builds are not reproducible |
 | JG-019 | P2 | FIXED | Supabase bootstrap SQL is not safely rerunnable |
 
@@ -477,8 +477,8 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 
 ### JG-017 — Known frontend development-tool vulnerabilities
 
-**Priority:** P2 / Medium  
-**Status:** OPEN
+**Priority:** P2 / Medium
+**Status:** FIXED
 
 > **Review comment:** `npm audit` reports one high and one moderate issue through
 > Vite/esbuild, including development-server file disclosure/path handling.
@@ -489,9 +489,16 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
   browser routes.
 - Until upgraded, never expose the Vite development server beyond localhost.
 
+**Fix**
+
+- Upgraded `vite` from 5.4.x to 6.4.3 (patches GHSA-fx2h-pf6j-xcff and related
+  path-handling advisories) which also pulls `esbuild` 0.25.x past the
+  GHSA-67mh-4wv8-2f99 range.
+- Production build retested successfully after the upgrade.
+
 **Verification**
 
-- `npm audit` reports no high findings.
+- `npm audit` reports no high findings (currently zero vulnerabilities).
 
 ### JG-018 — Python dependency resolution is not reproducible
 
@@ -581,7 +588,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 - Flagged action with `$0.90` cost: reported daily spend `$0` (JG-003).
 - Scanner-unavailable verdict under default policy: `flag` (JG-004).
 - Provider exception: no action/event persisted (JG-014).
-- `npm audit`: 1 high, 1 moderate development-tool vulnerability (JG-017).
+- `npm audit`: cleared after Vite 6.4.3 upgrade (JG-017).
 - Frontend build warned that the main JavaScript chunk exceeds 500 kB. This is
   a performance warning rather than a security defect, but route-based code
   splitting should be considered after the security backlog.
