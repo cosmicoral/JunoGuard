@@ -10,24 +10,38 @@ npm run dev          # http://localhost:5173
 ```
 
 The landing and sign-in screens run without a backend. Dashboard access uses
-Google OAuth through Supabase and therefore requires the two Supabase frontend
-variables below. The FastAPI gateway remains optional for the dashboard; with
-Supabase configured, the feed comes from Supabase Realtime.
+Google or GitHub OAuth through Supabase and therefore requires the two Supabase
+frontend variables below. The FastAPI gateway remains optional for the
+dashboard; with Supabase configured, the feed comes from Supabase Realtime.
 
-## Google OAuth
+## OAuth providers
+
+Both providers reuse the same Supabase client, PKCE callback, persisted session,
+route guard, and sign-out flow.
+
+First, in Supabase Authentication → URL Configuration, set the Site URL and add
+`http://localhost:5173/auth/callback` plus the production callback URL to the
+redirect allow list. Then copy `.env.example` to `.env.local` and set
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+
+### Google
 
 1. In Supabase Authentication → Providers, enable Google and add the client ID
    and secret from Google Cloud.
 2. In Google Cloud, add Supabase's callback URL as an authorized redirect URI:
    `https://<project-ref>.supabase.co/auth/v1/callback`.
-3. In Supabase Authentication → URL Configuration, set the Site URL and add
-   `http://localhost:5173/auth/callback` plus the production callback URL to
-   the redirect allow list.
-4. Copy `.env.example` to `.env.local`, then set `VITE_SUPABASE_URL` and
-   `VITE_SUPABASE_ANON_KEY`.
-5. Apply `supabase/schema.sql` for a fresh database, or apply
-   `supabase/migrations/202608010001_require_authenticated_dashboard_reads.sql`
-   to an existing database so anonymous clients cannot read dashboard data.
+
+### GitHub
+
+1. In GitHub Settings → Developer settings → OAuth Apps, create an OAuth app.
+   Use the JunoGuard deployment as the Homepage URL and set the Authorization
+   callback URL to `https://<project-ref>.supabase.co/auth/v1/callback`.
+2. In Supabase Authentication → Providers, enable GitHub and add the OAuth
+   app's client ID and client secret.
+
+Finally, apply `supabase/schema.sql` for a fresh database, or apply
+`supabase/migrations/202608010001_require_authenticated_dashboard_reads.sql`
+to an existing database so anonymous clients cannot read dashboard data.
 
 The browser uses the PKCE OAuth flow. Supabase persists and refreshes the
 session, `/auth/callback` exchanges the authorization code, and unauthenticated

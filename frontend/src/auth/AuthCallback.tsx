@@ -33,12 +33,12 @@ export function AuthCallback() {
 
       const { data, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) throw sessionError;
-      if (!data.session) throw new Error("Google sign-in completed without a session.");
+      if (!data.session) throw new Error("OAuth sign-in completed without a session.");
 
       window.location.replace("/dashboard");
     })().catch((reason: unknown) => {
       if (!active) return;
-      setError(reason instanceof Error ? reason.message : "Unable to complete Google sign-in.");
+      setError(reason instanceof Error ? reason.message : "Unable to complete OAuth sign-in.");
     });
 
     return () => {
@@ -56,7 +56,7 @@ export function AuthCallback() {
         {error ? (
           <>
             <p className="auth-kicker">AUTHENTICATION FAILED</p>
-            <h1>Google sign-in could not be completed.</h1>
+            <h1>Sign-in could not be completed.</h1>
             <p className="auth-error" role="alert">{error}</p>
             <a className="auth-retry" href="/auth/sign-in">Return to sign in</a>
           </>
@@ -65,7 +65,7 @@ export function AuthCallback() {
             <div className="auth-spinner" aria-hidden="true" />
             <p className="auth-kicker">SECURE SESSION</p>
             <h1>Completing sign-in…</h1>
-            <p>JunoGuard is exchanging the Google authorization for your Supabase session.</p>
+            <p>JunoGuard is exchanging the provider authorization for your Supabase session.</p>
           </>
         )}
       </section>

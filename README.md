@@ -209,16 +209,16 @@ uvicorn app.main:app --reload
 ```
 
 ```bash
-# Frontend — Google sign-in and live data use Supabase; FastAPI is optional
+# Frontend — OAuth sign-in and live data use Supabase; FastAPI is optional
 cd frontend
 npm install
 npm run dev          # configure frontend/.env.local for dashboard access
 ```
 
-Google sign-in and protected dashboard access require `VITE_SUPABASE_URL` and
-`VITE_SUPABASE_ANON_KEY`. Those same variables switch the data feed from mock
-mode to Supabase Realtime. See [`frontend/README.md`](frontend/README.md) for
-OAuth setup and demo controls.
+Google/GitHub sign-in and protected dashboard access require
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Those same variables switch
+the data feed from mock mode to Supabase Realtime. See
+[`frontend/README.md`](frontend/README.md) for OAuth setup and demo controls.
 
 Health check:
 

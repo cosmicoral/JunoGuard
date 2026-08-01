@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { isSupabaseConfigured, supabase } from "../lib/supabase";
-import { useAuth } from "./AuthContext";
+import { isSupabaseConfigured } from "../lib/supabase";
+import { useAuth, type OAuthProvider } from "./AuthContext";
 
 function GoogleMark() {
   return (
@@ -13,30 +13,33 @@ function GoogleMark() {
   );
 }
 
+function GitHubMark() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.6 22.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.4-1.3-1.8-1.3-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0C14.2 4.8 15.2 5 15.2 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.8 5.4-5.5 5.7.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6A11.5 11.5 0 0 0 12 .7Z" />
+    </svg>
+  );
+}
+
 export function SignIn() {
-  const { loading, session } = useAuth();
-  const [submitting, setSubmitting] = useState(false);
+  const { loading, session, signInWithProvider } = useAuth();
+  const [submittingProvider, setSubmittingProvider] = useState<OAuthProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && session) window.location.replace("/dashboard");
   }, [loading, session]);
 
-  const signIn = async () => {
-    if (!supabase || submitting) return;
-    setSubmitting(true);
+  const signIn = async (provider: OAuthProvider) => {
+    if (submittingProvider) return;
+    setSubmittingProvider(provider);
     setError(null);
 
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (oauthError) {
-      setError(oauthError.message);
-      setSubmitting(false);
+    try {
+      await signInWithProvider(provider);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : `Unable to start ${provider} sign-in.`);
+      setSubmittingProvider(null);
     }
   };
 
@@ -49,17 +52,29 @@ export function SignIn() {
         </a>
         <p className="auth-kicker">CONTROL PLANE ACCESS</p>
         <h1>Sign in to your JunoGuard console.</h1>
-        <p>Authenticate with your organization’s Google account to inspect live decisions and manage the gate.</p>
+        <p>Authenticate with Google or GitHub to inspect live decisions and manage the gate.</p>
 
-        <button
-          className="google-sign-in"
-          type="button"
-          onClick={() => void signIn()}
-          disabled={!isSupabaseConfigured || loading || submitting || Boolean(session)}
-        >
-          <GoogleMark />
-          {submitting ? "Redirecting to Google…" : "Continue with Google"}
-        </button>
+        <div className="auth-provider-list">
+          <button
+            className="oauth-sign-in google-provider"
+            type="button"
+            onClick={() => void signIn("google")}
+            disabled={!isSupabaseConfigured || loading || Boolean(submittingProvider) || Boolean(session)}
+          >
+            <GoogleMark />
+            {submittingProvider === "google" ? "Redirecting to Google…" : "Continue with Google"}
+          </button>
+
+          <button
+            className="oauth-sign-in github-provider"
+            type="button"
+            onClick={() => void signIn("github")}
+            disabled={!isSupabaseConfigured || loading || Boolean(submittingProvider) || Boolean(session)}
+          >
+            <GitHubMark />
+            {submittingProvider === "github" ? "Redirecting to GitHub…" : "Continue with GitHub"}
+          </button>
+        </div>
 
         {!isSupabaseConfigured && (
           <p className="auth-error" role="alert">
@@ -68,7 +83,7 @@ export function SignIn() {
         )}
         {error && <p className="auth-error" role="alert">{error}</p>}
 
-        <p className="auth-footnote">Protected by Supabase Auth. JunoGuard never receives your Google password.</p>
+        <p className="auth-footnote">Protected by Supabase Auth. JunoGuard never receives your provider password.</p>
       </section>
     </main>
   );

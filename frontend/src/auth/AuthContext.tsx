@@ -9,10 +9,13 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 
-interface AuthContextValue {
+export type OAuthProvider = "google" | "github";
+
+export interface AuthContextValue {
   loading: boolean;
   session: Session | null;
   user: User | null;
+  signInWithProvider: (provider: OAuthProvider) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -56,6 +59,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       session,
       user: session?.user ?? null,
+      signInWithProvider: async (provider) => {
+        if (!supabase) throw new Error("Supabase is not configured.");
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+        if (error) throw error;
+      },
       signOut: async () => {
         if (!supabase) return;
         const { error } = await supabase.auth.signOut();

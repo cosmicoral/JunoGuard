@@ -14,10 +14,15 @@ export function Dashboard() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const metadata = user?.user_metadata ?? {};
-  const userEmail = user?.email ?? "Email unavailable";
+  const userEmail =
+    user?.email ||
+    (typeof metadata.email === "string" && metadata.email) ||
+    "Email unavailable";
   const userName =
     (typeof metadata.full_name === "string" && metadata.full_name) ||
     (typeof metadata.name === "string" && metadata.name) ||
+    (typeof metadata.user_name === "string" && metadata.user_name) ||
+    (typeof metadata.preferred_username === "string" && metadata.preferred_username) ||
     user?.email?.split("@")[0] ||
     "JunoGuard user";
   const avatarUrl =
