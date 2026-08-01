@@ -1,0 +1,211 @@
+# junoguard
+
+> Supervision for AI coding agents. Juno watches what your agent installs and what it spends, and stops it before damage lands.
+
+An AI coding agent is a program with your credentials, your shell, and no
+judgement. It will install packages from registries anyone can publish to, run
+postinstall scripts with full access to your environment, and make model calls
+in a loop until something stops it.
+
+JunoGuard is the something.
+
+```bash
+npx junoguard init
+```
+
+That wires the MCP server into every AI coding agent it finds on your machine.
+From then on, every package your agent tries to install is checked first.
+
+---
+
+## What your agent sees
+
+When it tries to install something malicious:
+
+```text
+╭─ JUNO · BLOCKED ─────────────────────────────────────╮
+│  @ossprey/test-package  (npm)                        │
+╰──────────────────────────────────────────────────────╯
+
+VERDICT    malicious  ·  via Ossprey
+           Obfuscated postinstall script
+           Outbound POST on install
+
+BLAST RADIUS  if this had installed
+           credentials in scope   OPENAI_API_KEY,
+                                  SUPABASE_SERVICE_ROLE_KEY
+           network egress         unrestricted
+           write access           open repository
+
+           → full production credential compromise
+
+This package was not installed. Choose a different dependency.
+```
+
+Blocking is table stakes. The blast radius — what would have happened — is
+computed from the agent's actual scope, with no LLM involved.
+
+That last line matters more than it looks. It is written for the agent, not
+just for you: it says plainly that nothing was installed and that it should
+pick something else, so the agent self-corrects instead of retrying blindly or
+reaching for a different package manager.
+
+An allow is one quiet line, because allows happen constantly:
+
+```text
+✓ juno · allow — express (npm) · clean
+```
+
+---
+
+## Connect it to your agent
+
+```bash
+npx junoguard init              # detect installed agents, configure each
+npx junoguard init cursor       # or name them
+npx junoguard init --global     # user-level instead of project-level
+npx junoguard init --dry-run    # show what would change, write nothing
+```
+
+| Agent | Project scope | User scope |
+|---|---|---|
+| Cursor | `.cursor/mcp.json` | `~/.cursor/mcp.json` |
+| Claude Code | `.mcp.json` | `claude mcp add -s user junoguard -- npx -y junoguard mcp` |
+| Codex | — | `~/.codex/config.toml` |
+| VS Code | `.vscode/mcp.json` | user `mcp.json` |
+| Windsurf | — | `~/.codeium/windsurf/mcp_config.json` |
+
+`init` merges into whatever is already there and never replaces an existing
+`junoguard` entry without `--force`. If a config file cannot be parsed, it
+prints the snippet for you to paste rather than overwriting your settings.
+
+Restart the agent, or refresh its MCP panel, to pick up the change.
+
+Prefer to wire it yourself:
+
+```json
+{
+  "mcpServers": {
+    "junoguard": {
+      "command": "npx",
+      "args": ["-y", "junoguard", "mcp"]
+    }
+  }
+}
+```
+
+### Tools
+
+| Tool | Purpose |
+|---|---|
+| `guard_install(package, ecosystem, version)` | Scan a dependency before it reaches disk |
+| `guard_llm(prompt, model, max_output_tokens)` | Proxied model call under budget and burst policy |
+| `guard_status()` | Spend today, budget remaining, rate, open incidents |
+
+`guard_status` matters: the agent can check its own budget before a run of
+expensive work, rather than discovering the limit by hitting it.
+
+---
+
+## The CLI
+
+```bash
+npm i -g junoguard
+```
+
+```bash
+juno status                    # budget, spend, rate limit, incidents
+juno scan express              # scan without installing
+juno scan requests -e pypi     # scan a PyPI package
+juno npm install react zod     # scan, then run the real npm
+juno pip install requests      # scan, then run the real pip
+juno watch                     # tail the live decision feed
+```
+
+The forwarder is the one that matters. It scans every named package and only
+shells out to the real package manager if all of them come back clean:
+
+```console
+$ juno npm install express @ossprey/test-package
+✓ juno · allow — express (npm) · clean
+╭─ JUNO · BLOCKED ─────────────────────────────────────╮
+│  @ossprey/test-package  (npm)                        │
+╰──────────────────────────────────────────────────────╯
+...
+npm was not run. 1 of 2 packages blocked: @ossprey/test-package
+$ echo $?
+2
+```
+
+Flags reach the package manager untouched and in their original order. Local
+paths and git/http installs cannot be scanned by name, and the CLI says so out
+loud rather than implying they were approved.
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | allowed (or flagged — flags do not stop the install) |
+| `2` | blocked by policy |
+| `3` | the guard could not be consulted |
+
+`2` and `3` are deliberately distinct: "Juno said no" and "Juno was down" are
+different problems. Both stop the install.
+
+---
+
+## Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `JUNO_API_URL` | `http://localhost:8000` | Gateway base URL |
+| `JUNO_PROJECT_KEY` | `jg_demo_key_cursorhack2026` | Sent as `X-Juno-Key` |
+| `JUNO_MOCK` | unset | `1` for offline fixtures, no network at all |
+| `JUNO_TIMEOUT` | `20` | Seconds before a gateway call gives up |
+
+### Offline mode
+
+`JUNO_MOCK=1` makes every surface return realistic canned responses with no
+network — useful for trying the tool, and for demos where the gateway may not
+be up.
+
+| Input | Result |
+|---|---|
+| `@ossprey/test-package` | **block** · malicious · full blast radius |
+| `@ossprey/suspicious-package` | **flag** · unknown provenance |
+| any other package | **allow** · clean |
+| `guard_llm` with `max_output_tokens > 2000` | **block** · per-request cap |
+| `guard_llm` otherwise | **allow** · fixture answer, clearly labelled |
+
+Fixture verdicts render as *"via Ossprey (offline fixture)"*, never as a live
+scan, and the fixture model answer says outright that no model was called.
+
+---
+
+## Design
+
+**A block is not an error.** The gateway returns HTTP 200 with
+`decision: "block"`, and the MCP tools return it as a normal successful result.
+Throwing would surface as a tool failure, and a failed tool is something an
+agent retries.
+
+**The return value is the interface.** What the tools return is rendered
+straight into the agent's chat, so visual weight matches severity: an allow is
+a single quiet line, a flag is a square-bordered caution, a block is a
+rounded-border refusal with the blast radius under it.
+
+**An unreachable guard is not permission.** If the gateway cannot be consulted,
+every surface returns a refusal-shaped `JUNO · UNAVAILABLE` panel and the CLI
+exits non-zero without running your package manager. Failing open would defeat
+the point.
+
+**No LLM on the hot path.** Package verdicts, token accounting, cost, rate
+limiting and budget enforcement are all deterministic. We do not spend AI
+tokens to protect AI tokens.
+
+---
+
+Requires Node 18+. Talks to a JunoGuard gateway; see the
+[project README](https://github.com/cosmicoral/TokenGuard) for running one.
+
+MIT.
