@@ -21,13 +21,23 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-import { JunoClient, JunoUnavailable } from "./client.js";
-import { renderError, renderInstall, renderLlm, renderStatus, toPlain } from "./render.js";
+import { JunoClient, JunoNotConfigured, JunoUnavailable } from "./client.js";
+import {
+  renderError,
+  renderInstall,
+  renderLlm,
+  renderNotConfigured,
+  renderStatus,
+  toPlain,
+} from "./render.js";
 import type { Ecosystem } from "./types.js";
 
 const asText = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
 
 function unavailable(subject: string, error: unknown, consequence: string) {
+  if (error instanceof JunoNotConfigured) {
+    return asText(toPlain(renderNotConfigured(subject, new JunoClient().apiUrl)));
+  }
   const detail = error instanceof JunoUnavailable ? error.detail : String(error);
   return asText(toPlain(renderError(subject, detail, consequence)));
 }

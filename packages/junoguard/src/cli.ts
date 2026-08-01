@@ -23,11 +23,12 @@ import {
   type Scope,
   type ServerEntry,
 } from "./agents.js";
-import { DEFAULT_API_URL, DEFAULT_PROJECT_KEY, JunoClient, JunoUnavailable } from "./client.js";
+import { DEFAULT_API_URL, JunoClient, JunoNotConfigured, JunoUnavailable } from "./client.js";
 import { SCRIPT, clockNow, diffStatus, renderEvent, type Event } from "./feed.js";
 import {
   renderError,
   renderInstall,
+  renderNotConfigured,
   renderStatus,
   type Line,
   type Style,
@@ -39,6 +40,7 @@ import type { Ecosystem, StatusResult } from "./types.js";
 const EXIT_OK = 0;
 const EXIT_BLOCKED = 2;
 const EXIT_UNAVAILABLE = 3;
+const EXIT_NOT_CONFIGURED = 4;
 
 const PAINT: Record<Style, (value: string) => string> = {
   "": (value) => value,
@@ -69,6 +71,10 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // --------------------------------------------------------------------------
 
 function unreachable(subject: string, error: unknown, consequence: string): never {
+  if (error instanceof JunoNotConfigured) {
+    err(renderNotConfigured(subject, new JunoClient().apiUrl));
+    process.exit(EXIT_NOT_CONFIGURED);
+  }
   const detail = error instanceof JunoUnavailable ? error.detail : String(error);
   err(renderError(subject, detail, consequence));
   process.exit(EXIT_UNAVAILABLE);
@@ -220,6 +226,12 @@ async function cmdWatch(argv: string[]): Promise<number> {
       }
       previous = current;
     } catch (error) {
+      // A missing key will never fix itself by polling harder.
+      if (error instanceof JunoNotConfigured) {
+        console.log();
+        err(renderNotConfigured("live decision feed", client.apiUrl));
+        return EXIT_NOT_CONFIGURED;
+      }
       const detail = error instanceof JunoUnavailable ? error.detail : String(error);
       printEvent({ decision: "block", lane: "guard", detail: `gateway unreachable — ${detail}` });
     }
@@ -234,16 +246,23 @@ function cmdInit(argv: string[]): number {
   const dryRun = Boolean(flags.bools["dry-run"]);
   const force = Boolean(flags.bools.force);
 
+  // In mock mode no gateway or key is involved at all. Otherwise carry through
+  // whatever is in the environment — and never invent a key, since a config
+  // containing a made-up credential looks configured but silently 401s.
+  const projectKey = process.env.JUNO_PROJECT_KEY;
+  const env: Record<string, string> = flags.bools.mock
+    ? { JUNO_MOCK: "1" }
+    : {
+        JUNO_API_URL: process.env.JUNO_API_URL ?? DEFAULT_API_URL,
+        ...(projectKey ? { JUNO_PROJECT_KEY: projectKey } : {}),
+      };
+
   const entry: ServerEntry = {
     command: flags.bools.local ? process.execPath : "npx",
     args: flags.bools.local
       ? [new URL("./bin.js", import.meta.url).pathname, "mcp"]
       : ["-y", "junoguard", "mcp"],
-    env: {
-      JUNO_API_URL: process.env.JUNO_API_URL ?? DEFAULT_API_URL,
-      JUNO_PROJECT_KEY: process.env.JUNO_PROJECT_KEY ?? DEFAULT_PROJECT_KEY,
-      ...(flags.bools.mock ? { JUNO_MOCK: "1" } : {}),
-    },
+    env,
   };
 
   const requested = flags.positional.length
@@ -295,6 +314,13 @@ function cmdInit(argv: string[]): number {
   }
 
   console.log();
+  if (!flags.bools.mock && !projectKey) {
+    // Written, but it will refuse every action until this is set. Say so now
+    // rather than letting them discover it mid-demo.
+    say("no JUNO_PROJECT_KEY in your environment — the config is incomplete.", "flag");
+    say("  add one to the env block above, or re-run with --mock to try it offline.", "dim");
+    console.log();
+  }
   if (flags.bools.local) {
     say("--local wrote an absolute path to this checkout, for pre-publish testing.", "flag");
   } else {
@@ -365,13 +391,16 @@ ${pc.bold("SCAN")}
   --package-version <version>
 
 ${pc.bold("ENVIRONMENT")}
+  JUNO_PROJECT_KEY          ${pc.bold("required")} for live use — sent as X-Juno-Key
   JUNO_API_URL              gateway base URL (default ${DEFAULT_API_URL})
-  JUNO_PROJECT_KEY          sent as X-Juno-Key
-  JUNO_MOCK=1               offline fixtures, no network at all
+  JUNO_MOCK=1               offline fixtures, no network, no key needed
   JUNO_TIMEOUT              seconds before a gateway call gives up
 
+${pc.bold("TRY IT WITHOUT A GATEWAY")}
+  JUNO_MOCK=1 juno scan @ossprey/test-package
+
 ${pc.bold("EXIT CODES")}
-  0 allowed · 2 blocked by policy · 3 guard unreachable
+  0 allowed · 2 blocked by policy · 3 guard unreachable · 4 not configured
 `.trim();
 
 export async function main(argv: string[], version: string): Promise<number> {

@@ -9,12 +9,29 @@ in a loop until something stops it.
 
 JunoGuard is the something.
 
+## Try it in ten seconds
+
+No gateway, no account, no key — offline fixtures, no network at all:
+
 ```bash
-npx junoguard init
+JUNO_MOCK=1 npx junoguard scan @ossprey/test-package
 ```
 
-That wires the MCP server into every AI coding agent it finds on your machine.
+## Then wire it into your agent
+
+```bash
+npx junoguard init --mock     # offline, to see it working end to end
+npx junoguard init            # against your own gateway (see below)
+```
+
+That writes MCP config for every AI coding agent it finds on your machine.
 From then on, every package your agent tries to install is checked first.
+
+> **This package is a client.** It renders decisions; it does not make them.
+> Live use needs a JunoGuard gateway — yours, self-hosted — and a project key.
+> There is no hosted service and no default key: shipping one would point your
+> installs at someone else's server with a credential you did not choose.
+> Without either, every action is refused rather than waved through.
 
 ---
 
@@ -148,9 +165,10 @@ loud rather than implying they were approved.
 | `0` | allowed (or flagged — flags do not stop the install) |
 | `2` | blocked by policy |
 | `3` | the guard could not be consulted |
+| `4` | no project key configured |
 
-`2` and `3` are deliberately distinct: "Juno said no" and "Juno was down" are
-different problems. Both stop the install.
+These are deliberately distinct: "Juno said no", "Juno was down" and "you never
+set Juno up" are three different problems. All of them stop the install.
 
 ---
 
@@ -158,10 +176,37 @@ different problems. Both stop the install.
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `JUNO_PROJECT_KEY` | **none — required for live use** | Sent as `X-Juno-Key` |
 | `JUNO_API_URL` | `http://localhost:8000` | Gateway base URL |
-| `JUNO_PROJECT_KEY` | `jg_demo_key_cursorhack2026` | Sent as `X-Juno-Key` |
-| `JUNO_MOCK` | unset | `1` for offline fixtures, no network at all |
+| `JUNO_MOCK` | unset | `1` for offline fixtures — no network, no key needed |
 | `JUNO_TIMEOUT` | `20` | Seconds before a gateway call gives up |
+
+There is deliberately no default project key. Without one, every surface
+returns a `JUNO · NOT CONFIGURED` refusal and the CLI exits `4` — it does not
+fall back to running your package manager unguarded.
+
+### Running a gateway
+
+The gateway is the policy engine: Ossprey verdicts, budgets, rate limits, the
+kill switch. It is a separate FastAPI service in the
+[project repository](https://github.com/cosmicoral/TokenGuard).
+
+```bash
+git clone https://github.com/cosmicoral/TokenGuard
+cd TokenGuard/backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env          # add Supabase and Ossprey credentials
+uvicorn app.main:app --reload
+```
+
+Then point this package at it:
+
+```bash
+export JUNO_API_URL=http://localhost:8000
+export JUNO_PROJECT_KEY=<your project key>
+npx junoguard init
+```
 
 ### Offline mode
 

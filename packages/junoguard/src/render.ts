@@ -345,3 +345,26 @@ export function renderError(subject: string, detail: string, consequence: string
   lines.push(text(consequence, "block"));
   return lines;
 }
+
+/**
+ * Shown when no project key is set. Also a refusal — nothing was checked, so
+ * nothing is approved — but it fails toward teaching rather than alarm, since
+ * the cause is setup rather than an attack.
+ */
+export function renderNotConfigured(subject: string, apiUrl: string): Line[] {
+  const lines = banner("JUNO · NOT CONFIGURED", subject, "flag", false);
+  lines.push(blank());
+  lines.push(field("MISSING", "JUNO_PROJECT_KEY", "flag"));
+  lines.push(cont("Nothing was checked, so nothing is approved.", "dim"));
+  lines.push(blank());
+  lines.push([["TRY IT", "label"]]);
+  lines.push(sub("offline, no gateway", "JUNO_MOCK=1", "key"));
+  lines.push(blank());
+  lines.push([["CONNECT", "label"]]);
+  lines.push(sub("your gateway", `JUNO_API_URL=${apiUrl}`, "key"));
+  lines.push(sub("your project key", "JUNO_PROJECT_KEY=…", "key"));
+  lines.push(blank());
+  lines.push(cont("JunoGuard ships no default key on purpose — a shipped", "dim"));
+  lines.push(cont("credential would point you at someone else's gateway.", "dim"));
+  return lines;
+}

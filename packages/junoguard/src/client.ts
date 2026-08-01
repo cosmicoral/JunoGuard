@@ -13,7 +13,6 @@ import { randomUUID } from "node:crypto";
 import type { Ecosystem, InstallResult, LlmResult, StatusResult } from "./types.js";
 
 export const DEFAULT_API_URL = "http://localhost:8000";
-export const DEFAULT_PROJECT_KEY = "jg_demo_key_cursorhack2026";
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 const TRUTHY = new Set(["1", "true", "yes", "on"]);
@@ -30,6 +29,21 @@ export class JunoUnavailable extends Error {
   }
 }
 
+/**
+ * No project key. Deliberately distinct from JunoUnavailable: "you have not
+ * set this up" and "the gateway is down" need different advice, even though
+ * both mean the action was not approved.
+ *
+ * There is no default key. Shipping one in a public package would point every
+ * install at someone else's gateway with a credential they did not choose.
+ */
+export class JunoNotConfigured extends Error {
+  constructor(readonly detail = "no project key configured") {
+    super(detail);
+    this.name = "JunoNotConfigured";
+  }
+}
+
 export function mockEnabled(): boolean {
   return TRUTHY.has((process.env.JUNO_MOCK ?? "").trim().toLowerCase());
 }
@@ -43,19 +57,23 @@ export interface ClientOptions {
 
 export class JunoClient {
   readonly apiUrl: string;
-  readonly projectKey: string;
+  readonly projectKey: string | undefined;
   readonly mock: boolean;
   private readonly timeoutMs: number;
 
   constructor(options: ClientOptions = {}) {
     this.apiUrl = (options.apiUrl ?? process.env.JUNO_API_URL ?? DEFAULT_API_URL).replace(/\/+$/, "");
-    this.projectKey = options.projectKey ?? process.env.JUNO_PROJECT_KEY ?? DEFAULT_PROJECT_KEY;
+    this.projectKey = options.projectKey ?? process.env.JUNO_PROJECT_KEY ?? undefined;
     this.mock = options.mock ?? mockEnabled();
     const fromEnv = Number(process.env.JUNO_TIMEOUT);
     this.timeoutMs = options.timeoutMs ?? (fromEnv > 0 ? fromEnv * 1000 : DEFAULT_TIMEOUT_MS);
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    // Checked here rather than in the constructor so that commands which never
+    // reach the network — `init`, `--help` — work without any configuration.
+    if (!this.projectKey) throw new JunoNotConfigured();
+
     const url = `${this.apiUrl}${path}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
