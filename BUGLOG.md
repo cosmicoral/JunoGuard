@@ -35,7 +35,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-008 | P1 | OPEN | A configured live dashboard silently degrades to mock data |
 | JG-009 | P1 | OPEN | CLI and MCP enforcement can be bypassed by supported install paths |
 | JG-010 | P1 | OPEN | Package verdict cache can preserve a stale `latest` allow indefinitely |
-| JG-011 | P1 | OPEN | Realtime subscriptions are not project-scoped and can mix tenant data |
+| JG-011 | P1 | FIXED | Realtime subscriptions are not project-scoped and can mix tenant data |
 | JG-012 | P1 | OPEN | Product claims include Modal, SBOM, and unbypassable enforcement that are not implemented |
 | JG-013 | P1 | OPEN | No project-owned automated tests protect security invariants |
 | JG-014 | P2 | OPEN | Provider failures produce no action or audit event |
@@ -335,7 +335,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-011 — Realtime subscriptions are not project-scoped
 
 **Priority:** P1 / High  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** Initial Supabase queries filter by the selected project,
 > but Realtime subscriptions listen to all action, incident, and project rows.

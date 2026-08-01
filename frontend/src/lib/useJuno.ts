@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { actionFromEvent, incidentFromEvent, projectFromEvent } from "./events";
 import { apiUrl, dataSource, isLive, JUNO_KEY, OPERATOR_TOKEN, supabase } from "./supabase";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { AgentAction, Incident, Policy, Project } from "./types";
 import {
   ACTIONS_EARLIER_TODAY,
@@ -223,6 +224,7 @@ export function useJuno(): JunoState {
     if (dataSource !== "supabase" || !supabase) return;
     const db = supabase;
     let cancelled = false;
+    let channel: RealtimeChannel | null = null;
 
     (async () => {
       // Membership decides which project this dashboard shows. Ordering the
@@ -283,38 +285,52 @@ export function useJuno(): JunoState {
         setBlockedCount(ordered.filter((a) => a.decision === "block").length);
       }
       setIncidents((incs as Incident[]) ?? []);
-    })();
 
-    const channel = supabase
-      .channel("juno")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "agent_actions" },
-        (payload) => push([payload.new as AgentAction]),
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "incidents" },
-        (payload) => {
-          const row = payload.new as Incident;
-          setIncidents((prev) => [row, ...prev.filter((i) => i.id !== row.id)]);
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "projects" },
-        (payload) => {
-          const row = payload.new as Project;
-          setProject((prev) => (prev.id === row.id ? { ...prev, ...row } : prev));
-          if (row.status === "suspended") setSuspendedAt(Date.now());
-          if (row.status === "active") setSuspendedAt(null);
-        },
-      )
-      .subscribe();
+      // Subscribe only once the project is known, and scope every subscription
+      // to it. The initial queries were already filtered, but the Realtime
+      // listeners were not: they took every insert on agent_actions, incidents
+      // and projects and dropped it straight into this dashboard, so one
+      // account's screen could fill with another project's traffic.
+      const scope = `project_id=eq.${p.id}`;
+      channel = db
+        .channel(`juno:${p.id}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "agent_actions", filter: scope },
+          (payload) => {
+            const row = payload.new as AgentAction;
+            // Defense in depth: the server filters, and we check anyway.
+            if (row.project_id && row.project_id !== p.id) return;
+            push([row]);
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "incidents", filter: scope },
+          (payload) => {
+            const row = payload.new as Incident;
+            if (row.project_id && row.project_id !== p.id) return;
+            setIncidents((prev) => [row, ...prev.filter((i) => i.id !== row.id)]);
+          },
+        )
+        .on(
+          "postgres_changes",
+          // projects is keyed by id, not project_id.
+          { event: "UPDATE", schema: "public", table: "projects", filter: `id=eq.${p.id}` },
+          (payload) => {
+            const row = payload.new as Project;
+            if (row.id !== p.id) return;
+            setProject((prev) => ({ ...prev, ...row }));
+            if (row.status === "suspended") setSuspendedAt(Date.now());
+            if (row.status === "active") setSuspendedAt(null);
+          },
+        )
+        .subscribe();
+    })();
 
     return () => {
       cancelled = true;
-      db.removeChannel(channel);
+      if (channel) db.removeChannel(channel);
     };
   }, [push]);
 
