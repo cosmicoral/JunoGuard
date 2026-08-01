@@ -32,7 +32,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 | JG-005 | P1 | FIXED | Event backfill and SSE stream are unauthenticated and global |
 | JG-006 | P1 | FIXED | OAuth does not protect kill-switch operations; the browser ships an agent key |
 | JG-007 | P1 | FIXED | OAuth regression makes the default mock/offline dashboard unreachable |
-| JG-008 | P1 | OPEN | A configured live dashboard silently degrades to mock data |
+| JG-008 | P1 | FIXED | A configured live dashboard silently degrades to mock data |
 | JG-009 | P1 | OPEN | CLI and MCP enforcement can be bypassed by supported install paths |
 | JG-010 | P1 | OPEN | Package verdict cache can preserve a stale `latest` allow indefinitely |
 | JG-011 | P1 | FIXED | Realtime subscriptions are not project-scoped and can mix tenant data |
@@ -270,7 +270,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-008 — Live gateway failure silently becomes mock success
 
 **Priority:** P1 / High  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** When `VITE_API_URL` is configured but the gateway cannot
 > be reached, the dashboard seeds mock history and continues. A security

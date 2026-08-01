@@ -111,7 +111,12 @@ export interface JunoState {
   role: string | null;
   /** False when this operator may not change project state. */
   canControl: boolean;
+  /** A configured gateway is unreachable. Counters are frozen, controls are off. */
+  degraded: boolean;
+  /** The operator explicitly asked for simulated traffic. */
+  simulating: boolean;
   toggleSuspend: () => void;
+  enterSimulation: () => void;
 }
 
 export function useJuno(): JunoState {
@@ -139,11 +144,15 @@ export function useJuno(): JunoState {
   const [feedError, setFeedError] = useState<string | null>(null);
   // Role on the selected project, from project_members. Null until known.
   const [role, setRole] = useState<string | null>(null);
-  // Set when the gateway is configured but unreachable. An empty dashboard is
-  // the one outcome the demo cannot survive, so we drop back to mock traffic
-  // and say so in the feed badge rather than showing a blank screen.
-  const [gatewayDown, setGatewayDown] = useState(false);
-  const source: typeof dataSource = gatewayDown ? "mock" : dataSource;
+  // Set when a configured gateway cannot be reached. The dashboard stays on its
+  // real data source and reports the outage — it does not quietly become a
+  // simulation, because an operator cannot tell invented traffic from real
+  // traffic once it is on the screen.
+  const [degraded, setDegraded] = useState(false);
+  // Simulation is opt-in and explicit. Nothing enters it on the app's own
+  // initiative.
+  const [simulating, setSimulating] = useState(false);
+  const source: typeof dataSource = simulating ? "mock" : dataSource;
 
   // Rollups accumulate. Deriving them from the visible buffer would make both
   // figures fall as old rows are trimmed off the end, which is worse than
@@ -170,13 +179,16 @@ export function useJuno(): JunoState {
    * that is guaranteed to 403 is its own kind of lie. Resume is owner-only, so
    * an operator loses the control once the project is suspended.
    */
-  const canControl = !apiUrl
-    ? true // pure mock: the toggle is local and affects nothing real
-    : supabase
-      ? suspended
-        ? role === "owner"
-        : role === "operator" || role === "owner"
-      : Boolean(OPERATOR_TOKEN);
+  const canControl =
+    degraded || simulating
+      ? false // nothing to control: the gateway is unreachable, or this is a simulation
+      : !apiUrl
+        ? true // pure mock: the toggle is local and affects nothing real
+        : supabase
+          ? suspended
+            ? role === "owner"
+            : role === "operator" || role === "owner"
+          : Boolean(OPERATOR_TOKEN);
 
   const applyProjectStatus = useCallback((status: Project["status"], markTime: boolean) => {
     setProject((prev) => (prev.status === status ? prev : { ...prev, status }));
@@ -205,6 +217,22 @@ export function useJuno(): JunoState {
 
   const pushIncident = useCallback((inc: Incident) => {
     setIncidents((prev) => [inc, ...prev.filter((i) => i.id !== inc.id)]);
+  }, []);
+
+  /**
+   * Deliberately enter simulation after a gateway outage — for a rehearsal, or
+   * to keep a stage demo moving. Never called automatically: the whole point of
+   * the degraded state is that the operator knows which one they are looking at.
+   */
+  const enterSimulation = useCallback(() => {
+    const seeded = seedActions();
+    for (const a of seeded) seenIds.current.add(a.id);
+    setActions(seeded);
+    setIncidents(seedIncidents(seeded));
+    setSpendToday(SPEND_EARLIER_TODAY + sumBillableCost(seeded));
+    setBlockedCount(seeded.filter((a) => a.decision === "block").length);
+    setPolicy(MOCK_POLICY);
+    setSimulating(true);
   }, []);
 
   // ---- mock mode -----------------------------------------------------------
@@ -414,18 +442,18 @@ export function useJuno(): JunoState {
       if (cancelled) return;
 
       // Gateway configured but not answering — usually uvicorn is not running,
-      // or CORS rejected the origin. Fall back to mock rather than show nothing.
+      // or CORS rejected the origin.
+      //
+      // This used to seed mock history and start mock traffic, which meant a
+      // dead control plane looked like a working one: an operator watching
+      // invented "allow" rows go by would have no way to know nothing was being
+      // supervised. Say the gate is down, freeze the counters, and let a human
+      // ask for a simulation if they actually want one.
       if (!reached) {
-        const fallback = seedActions();
-        for (const a of fallback) seenIds.current.add(a.id);
-        setActions(fallback);
-        setIncidents(seedIncidents(fallback));
-        setSpendToday(SPEND_EARLIER_TODAY + sumBillableCost(fallback));
-        setBlockedCount(fallback.filter((a) => a.decision === "block").length);
-        setPolicy(MOCK_POLICY);
-        setGatewayDown(true);
+        setDegraded(true);
         return;
       }
+      setDegraded(false);
 
       // The stream is authenticated by a short-lived token rather than by the
       // project key: EventSource cannot send headers, and a long-lived key in a
@@ -605,6 +633,9 @@ export function useJuno(): JunoState {
     feedError,
     role,
     canControl,
+    degraded,
+    simulating,
     toggleSuspend,
+    enterSimulation,
   };
 }

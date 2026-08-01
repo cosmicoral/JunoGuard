@@ -79,7 +79,34 @@ export function Dashboard() {
       </AnimatePresence>
 
       <div className="app">
-        {mode === "demo" && (
+        {juno.degraded && (
+          <p className="mode-banner" data-mode="degraded" role="alert">
+            <strong>DEGRADED — GATEWAY UNREACHABLE</strong>
+            <span>
+              This console is not receiving decisions. The counters below are frozen and
+              the kill switch is disabled. Agents are not necessarily unsupervised — the
+              gateway may be enforcing policy while this page cannot reach it.
+            </span>
+            <button type="button" className="mode-action" onClick={() => window.location.reload()}>
+              RETRY
+            </button>
+            <button type="button" className="mode-action" onClick={juno.enterSimulation}>
+              ENTER DEMO SIMULATION
+            </button>
+          </p>
+        )}
+
+        {juno.simulating && (
+          <p className="mode-banner" data-mode="simulation" role="status">
+            <strong>SIMULATION</strong>
+            <span>
+              Invented traffic, requested by an operator after a gateway outage. Nothing on
+              this page reflects a real agent.
+            </span>
+          </p>
+        )}
+
+        {mode === "demo" && !juno.degraded && !juno.simulating && (
           <p className="mode-banner" data-mode="demo" role="status">
             <strong>DEMO</strong>
             {juno.source === "mock"
