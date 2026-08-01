@@ -30,8 +30,21 @@ CREDENTIAL_MARKERS = (
     "DSN",
 )
 
-# Names that are noisy rather than sensitive.
-IGNORE = ("SSH_AUTH_SOCK", "KEYBOARD", "KEYMAP")
+# Names that are noisy rather than sensitive. MAX_REQUEST_TOKENS and friends
+# match the TOKEN marker but are limits, not secrets — naming one as a
+# credential in scope undermines every other name on the list.
+IGNORE = (
+    "SSH_AUTH_SOCK",
+    "KEYBOARD",
+    "KEYMAP",
+    "MAX_REQUEST_TOKENS",
+    "MAX_TOKENS",
+    "MAX_OUTPUT_TOKENS",
+    "TOKENS_PER",
+    "TOKEN_LIMIT",
+    "PUBLIC_KEY",
+    "KEY_LENGTH",
+)
 
 # Environment variables that imply cloud reach rather than a single API.
 CLOUD_MARKERS = {
