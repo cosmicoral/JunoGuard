@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environment variables
+.env
+.env.local
+
+# Node
+node_modules/
+dist/
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
