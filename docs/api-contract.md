@@ -135,6 +135,25 @@ worst-case cost before the provider is called, and the reservation counts
 toward both limits until the action is recorded. At most
 `max_requests_per_min` concurrent requests reach the provider.
 
+**Provider failures are audited, not swallowed.** The attempt is recorded before
+the provider is called and settled afterwards, so every attempted call leaves
+exactly one durable row with a `metadata.provider_status` of `succeeded`,
+`failed` (never reached the provider — no charge) or `unknown_charge` (the
+request was sent and the response lost). An `unknown_charge` is accounted at the
+estimated cost, because understating spend is what lets a cap be walked past.
+
+A failure returns `502` with a correlation ID that is the audit row's id:
+
+```jsonc
+{
+  "error": "provider_unavailable",
+  "detail": "The model provider did not complete this request: …",
+  "correlation_id": "uuid",
+  "action_id": "uuid",
+  "charge_status": "unknown_charge"
+}
+```
+
 **Response** — decision envelope, plus:
 
 ```jsonc

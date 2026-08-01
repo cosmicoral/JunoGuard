@@ -151,6 +151,13 @@ class MemoryStore:
             )
         return action_id
 
+    def update_action(self, action_id: str, fields: dict[str, Any]) -> None:
+        with self._lock:
+            for action in self.actions:
+                if action["id"] == action_id:
+                    action.update(fields)
+                    return
+
     def daily_spend_usd(self, project_id: str) -> float:
         """Every charged action, whatever it was labelled.
 
@@ -355,6 +362,12 @@ class SupabaseStore:
         )
         r.raise_for_status()
         return r.json()[0]["id"]
+
+    def update_action(self, action_id: str, fields: dict[str, Any]) -> None:
+        r = self._client.patch(
+            "/agent_actions", params={"id": f"eq.{action_id}"}, json=fields
+        )
+        r.raise_for_status()
 
     def daily_spend_usd(self, project_id: str) -> float:
         r = self._client.post("/rpc/daily_spend_usd", json={"p_project_id": project_id})

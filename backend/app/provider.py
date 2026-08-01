@@ -18,6 +18,24 @@ MOCK_ANSWER = (
 )
 
 
+def classify_failure(exc: BaseException) -> tuple[str, bool]:
+    """Did this failure possibly cost money? Returns (status, treat_as_charged).
+
+    The distinction matters for a budget cap. If we never reached the provider,
+    nothing was billed and the request should not consume budget. If the request
+    was sent and the response was lost, the provider may well have billed for
+    work we never received — so the charge is unknown, and unknown is accounted
+    for as spent. Understating spend is the direction that lets a cap be walked
+    past; overstating it only makes the guard stricter than it needs to be.
+    """
+    if isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, httpx.UnsupportedProtocol)):
+        return "failed", False
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500:
+        # The provider looked at the request and refused it.
+        return "failed", False
+    return "unknown_charge", True
+
+
 def complete(prompt: str, model: str, max_output_tokens: int) -> dict[str, Any]:
     """Forward one request. Returns real usage when the provider reports it."""
     if config.MOCK_PROVIDER or not config.PROVIDER_API_KEY:

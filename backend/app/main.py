@@ -132,11 +132,17 @@ class ResumeRequest(BaseModel):
 # --- helpers ----------------------------------------------------------------
 
 
-def _persist(project: dict[str, Any], verdict: risk.Verdict, **row: Any) -> str:
+def _persist(
+    project: dict[str, Any], verdict: risk.Verdict, *, publish: bool = True, **row: Any
+) -> str:
     """Record the decision, then any incident it raised, then any suspension.
 
     Order matters: the incident references the action, and the dashboard's
     Realtime feed should show the action land before the project goes dark.
+
+    `publish=False` records the row without announcing it, for an action whose
+    outcome is not known yet — a model call about to be attempted. The event is
+    published by _finalize once there is something true to say about it.
     """
     action_id = store.record_action(
         {
@@ -149,18 +155,19 @@ def _persist(project: dict[str, Any], verdict: risk.Verdict, **row: Any) -> str:
         }
     )
 
-    events.publish(
-        "action",
-        project["id"],
-        {
-            "id": action_id,
-            "decision": verdict.decision,
-            "reason": verdict.reason,
-            "risk_level": verdict.risk_level,
-            "metadata": verdict.metadata,
-            **row,
-        },
-    )
+    if publish:
+        events.publish(
+            "action",
+            project["id"],
+            {
+                "id": action_id,
+                "decision": verdict.decision,
+                "reason": verdict.reason,
+                "risk_level": verdict.risk_level,
+                "metadata": verdict.metadata,
+                **row,
+            },
+        )
 
     if verdict.incident:
         store.record_incident(
@@ -182,6 +189,31 @@ def _persist(project: dict[str, Any], verdict: risk.Verdict, **row: Any) -> str:
         )
 
     return action_id
+
+
+def _finalize(
+    project: dict[str, Any],
+    action_id: str,
+    verdict: risk.Verdict,
+    fields: dict[str, Any],
+) -> None:
+    """Settle a recorded attempt, and only now announce it.
+
+    Updates the existing row rather than writing a second one, so an attempted
+    provider call leaves exactly one durable audit record whatever happens to it.
+    """
+    store.update_action(action_id, fields)
+    events.publish(
+        "action",
+        project["id"],
+        {
+            "id": action_id,
+            "decision": verdict.decision,
+            "reason": verdict.reason,
+            "risk_level": verdict.risk_level,
+            **fields,
+        },
+    )
 
 
 def _envelope(action_id: str, verdict: risk.Verdict, status: str) -> dict[str, Any]:
@@ -317,37 +349,108 @@ def guard_llm(
             else:
                 verdict = risk.within_limits(base, spend_today, est_cost, policy)
 
-    answer: str | None = None
     tokens_in = int(verdict.metadata.get("tokens_in") or 0)
-    tokens_out = 0
-    cost = 0.0
 
-    try:
-        if verdict.decision != "block":
-            # The provider is called exactly once, and only after the decision.
-            result = provider.complete(
-                payload.prompt, payload.model, payload.max_output_tokens
-            )
-            answer = result["answer"]
-            tokens_in = result["tokens_in"]
-            tokens_out = result["tokens_out"]
-            cost = pricing.cost_usd(payload.model, tokens_in, tokens_out)
-
+    # Blocked: nothing is attempted, so the record is complete the moment it is
+    # written.
+    if verdict.decision == "block":
+        if reservation is not None:
+            store.release(reservation.reservation_id)
         action_id = _persist(
             project,
             verdict,
             action_type="llm_call",
             target=payload.model,
             tokens_in=tokens_in,
-            tokens_out=tokens_out,
-            cost_usd=cost,
+            tokens_out=0,
+            cost_usd=0.0,
         )
-    finally:
-        # Released only after the action row exists, so the charge is never
-        # invisible to a concurrent request. Briefly counting both is the safe
-        # direction to be wrong in.
+        return _envelope(action_id, verdict, project["status"]) | {
+            "answer": None,
+            "tokens_in": tokens_in,
+            "tokens_out": 0,
+            "cost_usd": 0.0,
+            "spend_today_usd": round(spend_today, 6),
+            "daily_budget_usd": policy["daily_budget_usd"],
+        }
+
+    # Proceeding: write the attempt down *before* calling the provider. If the
+    # provider raises or times out, the attempt is still on the record — the old
+    # code only recorded successes, so a provider outage left no trace of the
+    # call, the possible charge, or the decision that allowed it.
+    action_id = _persist(
+        project,
+        verdict,
+        publish=False,
+        action_type="llm_call",
+        target=payload.model,
+        tokens_in=tokens_in,
+        tokens_out=0,
+        # Reserved rather than spent. Replaced by the real figure on success, and
+        # kept as a conservative estimate if the charge is unknowable.
+        cost_usd=0.0,
+        metadata=verdict.metadata | {"provider_status": "attempted"},
+    )
+
+    try:
+        result = provider.complete(payload.prompt, payload.model, payload.max_output_tokens)
+    except Exception as exc:  # noqa: BLE001 - every failure must be recorded
+        status, charged = provider.classify_failure(exc)
+        # An ambiguous failure is charged at the estimate: the provider may well
+        # have billed for work we never saw, and understating spend is the
+        # dangerous direction for a budget cap.
+        cost = est_cost if charged else 0.0
+        _finalize(
+            project,
+            action_id,
+            verdict,
+            {
+                "cost_usd": cost,
+                "metadata": verdict.metadata
+                | {
+                    "provider_status": status,
+                    "provider_error": str(exc)[:500],
+                    "cost_is_estimate": charged,
+                },
+            },
+        )
         if reservation is not None:
             store.release(reservation.reservation_id)
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "provider_unavailable",
+                "detail": f"The model provider did not complete this request: {exc}",
+                # The audit row and the client's error name the same thing.
+                "correlation_id": action_id,
+                "action_id": action_id,
+                "charge_status": status,
+            },
+        ) from exc
+
+    answer = result["answer"]
+    tokens_in = result["tokens_in"]
+    tokens_out = result["tokens_out"]
+    cost = pricing.cost_usd(payload.model, tokens_in, tokens_out)
+
+    _finalize(
+        project,
+        action_id,
+        verdict,
+        {
+            "action_type": "llm_call",
+            "target": payload.model,
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+            "cost_usd": cost,
+            "metadata": verdict.metadata | {"provider_status": "succeeded"},
+        },
+    )
+
+    # Released only after the charge is on the record, so it is never invisible
+    # to a concurrent request. Briefly counting both is the safe direction.
+    if reservation is not None:
+        store.release(reservation.reservation_id)
 
     response = _envelope(action_id, verdict, project["status"]) | {
         "answer": answer,
