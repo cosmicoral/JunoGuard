@@ -85,6 +85,15 @@ Lane B. Proxied model call.
 }
 ```
 
+Optional `Idempotency-Key` header. Replaying a key returns the original
+response with `"idempotent_replay": true` and does not call the provider again,
+so a client retry cannot buy a second completion.
+
+Rate and daily-budget enforcement is atomic: the request reserves its
+worst-case cost before the provider is called, and the reservation counts
+toward both limits until the action is recorded. At most
+`max_requests_per_min` concurrent requests reach the provider.
+
 **Response** — decision envelope, plus:
 
 ```jsonc

@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import threading
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -61,6 +62,30 @@ def public_project(project: dict[str, Any]) -> dict[str, Any]:
     return {field: project.get(field) for field in PUBLIC_PROJECT_FIELDS}
 
 
+# --- reservations -----------------------------------------------------------
+#
+# A reservation is a claim on rate and budget taken *before* the provider is
+# called, and counted toward both limits until it is released. It is what makes
+# concurrent requests bounded by policy rather than by timing.
+
+# An abandoned reservation must not hold budget forever.
+RESERVATION_TTL = timedelta(minutes=2)
+
+
+@dataclass
+class Reservation:
+    """The atomic answer to 'may this request proceed, and at what cost?'."""
+
+    outcome: str  # "ok" | "rate_exceeded" | "budget_exceeded"
+    spend_today: float
+    requests_last_min: int
+    reservation_id: str | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.outcome == "ok"
+
+
 class MemoryStore:
     """Fallback store. Everything lives in one process and dies with it."""
 
@@ -78,6 +103,12 @@ class MemoryStore:
         self.policy = dict(config.DEFAULT_POLICY)
         self.actions: list[dict[str, Any]] = []
         self.incidents: list[dict[str, Any]] = []
+        # Held for the whole of reserve(), so this backend enforces limits with
+        # the same semantics as the SQL advisory lock rather than only looking
+        # like it does under a single-threaded demo.
+        self._reserve_lock = threading.Lock()
+        self.reservations: dict[str, dict[str, Any]] = {}
+        self._idempotent: dict[tuple[str, str], dict[str, Any]] = {}
 
     # --- projects -----------------------------------------------------------
 
@@ -134,6 +165,73 @@ class MemoryStore:
             if a["decision"] == "block"
             and datetime.fromisoformat(a["created_at"]) >= midnight
         )
+
+    # --- reservations -------------------------------------------------------
+
+    def _open_reservations(self, project_id: str) -> list[dict[str, Any]]:
+        cutoff = _now() - RESERVATION_TTL
+        return [
+            r
+            for r in self.reservations.values()
+            if r["project_id"] == project_id and r["created_at"] >= cutoff
+        ]
+
+    def reserve(
+        self,
+        project_id: str,
+        est_cost: float,
+        daily_budget_usd: float,
+        max_requests_per_min: int,
+    ) -> Reservation:
+        with self._reserve_lock:
+            # Drop anything a crashed request left behind.
+            for res_id in [
+                r_id
+                for r_id, r in self.reservations.items()
+                if r["created_at"] < _now() - RESERVATION_TTL
+            ]:
+                del self.reservations[res_id]
+
+            open_reservations = self._open_reservations(project_id)
+            spend = self.daily_spend_usd(project_id) + sum(
+                r["est_cost"] for r in open_reservations
+            )
+
+            minute_ago = _now() - timedelta(minutes=1)
+            rate = self.requests_last_min(project_id) + sum(
+                1 for r in open_reservations if r["created_at"] >= minute_ago
+            )
+
+            if rate >= max_requests_per_min:
+                return Reservation("rate_exceeded", spend, rate)
+
+            if spend + est_cost > daily_budget_usd:
+                return Reservation("budget_exceeded", spend, rate)
+
+            res_id = str(uuid.uuid4())
+            self.reservations[res_id] = {
+                "project_id": project_id,
+                "est_cost": est_cost,
+                "created_at": _now(),
+            }
+            return Reservation("ok", spend, rate, res_id)
+
+    def release(self, reservation_id: str | None) -> None:
+        if not reservation_id:
+            return
+        with self._reserve_lock:
+            self.reservations.pop(reservation_id, None)
+
+    # --- idempotency --------------------------------------------------------
+
+    def lookup_idempotent(self, project_id: str, key: str) -> dict[str, Any] | None:
+        return self._idempotent.get((project_id, key))
+
+    def remember_idempotent(
+        self, project_id: str, key: str, response: dict[str, Any]
+    ) -> None:
+        with self._lock:
+            self._idempotent[(project_id, key)] = response
 
     # --- incidents ----------------------------------------------------------
 
@@ -260,6 +358,63 @@ class SupabaseStore:
             "/incidents", project_id=f"eq.{project_id}", status="eq.open", select="id"
         )
         return len(rows)
+
+    # --- reservations -------------------------------------------------------
+
+    def reserve(
+        self,
+        project_id: str,
+        est_cost: float,
+        daily_budget_usd: float,
+        max_requests_per_min: int,
+    ) -> Reservation:
+        """One round trip, one transaction, one advisory lock. See
+        supabase/migrations/202608010003_atomic_spend_reservations.sql."""
+        r = self._client.post(
+            "/rpc/reserve_action",
+            json={
+                "p_project_id": project_id,
+                "p_est_cost": est_cost,
+                "p_daily_budget": daily_budget_usd,
+                "p_max_per_min": max_requests_per_min,
+            },
+        )
+        r.raise_for_status()
+        body = r.json() or {}
+        return Reservation(
+            outcome=str(body.get("outcome", "ok")),
+            spend_today=float(body.get("spend_today") or 0.0),
+            requests_last_min=int(body.get("requests_last_min") or 0),
+            reservation_id=body.get("reservation_id"),
+        )
+
+    def release(self, reservation_id: str | None) -> None:
+        if not reservation_id:
+            return
+        r = self._client.post("/rpc/release_reservation", json={"p_id": reservation_id})
+        r.raise_for_status()
+
+    # --- idempotency --------------------------------------------------------
+
+    def lookup_idempotent(self, project_id: str, key: str) -> dict[str, Any] | None:
+        rows = self._get(
+            "/idempotency_keys",
+            project_id=f"eq.{project_id}",
+            key=f"eq.{key}",
+            select="response",
+            limit=1,
+        )
+        return rows[0]["response"] if rows else None
+
+    def remember_idempotent(
+        self, project_id: str, key: str, response: dict[str, Any]
+    ) -> None:
+        r = self._client.post(
+            "/idempotency_keys",
+            json={"project_id": project_id, "key": key, "response": response},
+            headers={"Prefer": "resolution=ignore-duplicates"},
+        )
+        r.raise_for_status()
 
 
 def build_store():

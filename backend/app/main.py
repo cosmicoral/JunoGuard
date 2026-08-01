@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import config, demo, events, pricing, provider, risk
+from . import store as store_module
 from .store import public_project, store
 
 app = FastAPI(title="JunoGuard API", version="0.2.0")
@@ -168,50 +169,85 @@ def guard_install(
 
 @app.post("/v1/guard/llm")
 def guard_llm(
-    payload: LLMRequest, project: dict[str, Any] = Depends(current_project)
+    payload: LLMRequest,
+    project: dict[str, Any] = Depends(current_project),
+    idempotency_key: str = Header(default="", alias="Idempotency-Key"),
 ) -> dict[str, Any]:
-    """Lane B. Proxied model call, evaluated before the key is ever used."""
+    """Lane B. Proxied model call, evaluated before the key is ever used.
+
+    The rate and budget checks happen inside a single atomic reservation rather
+    than as a read-then-act pair, so concurrent requests are bounded by the
+    policy. The reservation counts toward both limits until it is released,
+    which is what stops twenty simultaneous calls sharing one slot.
+    """
+    if idempotency_key:
+        replay = store.lookup_idempotent(project["id"], idempotency_key)
+        if replay is not None:
+            # A retry must never buy a second completion.
+            return replay | {"idempotent_replay": True}
+
     policy = store.get_policy(project["id"])
-    spend_today = store.daily_spend_usd(project["id"])
+    base, tokens_in_est, est_cost = risk.estimate(
+        payload.prompt, payload.model, payload.max_output_tokens
+    )
+
+    reservation: store_module.Reservation | None = None
+    spend_today = 0.0
 
     if project["status"] == "suspended":
         verdict = risk.SUSPENDED
     else:
-        verdict = risk.evaluate_llm(
-            payload.prompt,
-            payload.model,
-            payload.max_output_tokens,
-            policy,
-            spend_today,
-            store.requests_last_min(project["id"]),
-        )
+        # Local limits first: no point reserving a slot for a request that can
+        # never be allowed no matter what the shared counters say.
+        verdict = risk.check_request_limits(base, tokens_in_est, est_cost, policy)
+        if verdict is None:
+            reservation = store.reserve(
+                project["id"],
+                est_cost,
+                policy["daily_budget_usd"],
+                policy["max_requests_per_min"],
+            )
+            spend_today = reservation.spend_today
+            if reservation.outcome == "rate_exceeded":
+                verdict = risk.rate_exceeded(base, reservation.requests_last_min, policy)
+            elif reservation.outcome == "budget_exceeded":
+                verdict = risk.budget_exceeded(base, spend_today, est_cost, policy)
+            else:
+                verdict = risk.within_limits(base, spend_today, est_cost, policy)
 
     answer: str | None = None
     tokens_in = int(verdict.metadata.get("tokens_in") or 0)
     tokens_out = 0
     cost = 0.0
 
-    if verdict.decision != "block":
-        # The provider is called exactly once, and only after the decision.
-        result = provider.complete(
-            payload.prompt, payload.model, payload.max_output_tokens
+    try:
+        if verdict.decision != "block":
+            # The provider is called exactly once, and only after the decision.
+            result = provider.complete(
+                payload.prompt, payload.model, payload.max_output_tokens
+            )
+            answer = result["answer"]
+            tokens_in = result["tokens_in"]
+            tokens_out = result["tokens_out"]
+            cost = pricing.cost_usd(payload.model, tokens_in, tokens_out)
+
+        action_id = _persist(
+            project,
+            verdict,
+            action_type="llm_call",
+            target=payload.model,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            cost_usd=cost,
         )
-        answer = result["answer"]
-        tokens_in = result["tokens_in"]
-        tokens_out = result["tokens_out"]
-        cost = pricing.cost_usd(payload.model, tokens_in, tokens_out)
+    finally:
+        # Released only after the action row exists, so the charge is never
+        # invisible to a concurrent request. Briefly counting both is the safe
+        # direction to be wrong in.
+        if reservation is not None:
+            store.release(reservation.reservation_id)
 
-    action_id = _persist(
-        project,
-        verdict,
-        action_type="llm_call",
-        target=payload.model,
-        tokens_in=tokens_in,
-        tokens_out=tokens_out,
-        cost_usd=cost,
-    )
-
-    return _envelope(action_id, verdict, project["status"]) | {
+    response = _envelope(action_id, verdict, project["status"]) | {
         "answer": answer,
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
@@ -219,6 +255,11 @@ def guard_llm(
         "spend_today_usd": round(spend_today + cost, 6),
         "daily_budget_usd": policy["daily_budget_usd"],
     }
+
+    if idempotency_key:
+        store.remember_idempotent(project["id"], idempotency_key, response)
+
+    return response
 
 
 @app.get("/v1/guard/status")

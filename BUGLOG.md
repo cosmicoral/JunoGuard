@@ -25,8 +25,8 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 
 | ID | Priority | Status | Finding |
 |---|---:|---|---|
-| JG-001 | P0 | OPEN | Authenticated users can read every project, including plaintext agent API keys |
-| JG-002 | P0 | OPEN | Rate and budget enforcement is non-atomic under concurrency |
+| JG-001 | P0 | FIXED | Authenticated users can read every project, including plaintext agent API keys |
+| JG-002 | P0 | FIXED | Rate and budget enforcement is non-atomic under concurrency |
 | JG-003 | P0 | OPEN | Charged `flag` decisions are excluded from daily spend |
 | JG-004 | P0 | OPEN | Scanner outage produces a proceedable `flag` instead of failing closed |
 | JG-005 | P1 | OPEN | Event backfill and SSE stream are unauthenticated and global |
@@ -50,7 +50,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-001 — Cross-project data and agent API keys are readable
 
 **Priority:** P0 / Critical  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** Authentication has been added, but authorization is still
 > global. Any Supabase user in the `authenticated` role can select every row in
@@ -91,7 +91,7 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 ### JG-002 — Rate and budget checks race under concurrency
 
 **Priority:** P0 / Critical  
-**Status:** OPEN
+**Status:** FIXED
 
 > **Review comment:** Policy evaluation reads the current request count and
 > spend, calls the provider, and persists the action as separate operations.

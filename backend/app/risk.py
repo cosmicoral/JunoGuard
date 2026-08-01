@@ -94,14 +94,16 @@ def evaluate_install(
 # --- Lane B: tokens and cost ------------------------------------------------
 
 
-def evaluate_llm(
-    prompt: str,
-    model: str,
-    max_output_tokens: int,
-    policy: dict[str, Any],
-    spend_today: float,
-    requests_last_min: int,
-) -> Verdict:
+# Lane B is split into the checks that need only this request (tokens, the
+# per-request price) and the checks that need shared state (rate, daily spend).
+# The shared-state pair is decided inside the store's atomic reservation, so
+# twenty simultaneous requests cannot all observe the same pre-limit counters.
+# Checking the local pair first means a request that can never be allowed is
+# rejected without taking a slot it would immediately give back.
+
+
+def estimate(prompt: str, model: str, max_output_tokens: int) -> tuple[dict[str, Any], int, float]:
+    """Worst-case shape of one request: metadata, input tokens, estimated cost."""
     tokens_in, tokens_out, est_cost = pricing.estimate_request_cost(
         model, prompt, max_output_tokens
     )
@@ -110,26 +112,13 @@ def evaluate_llm(
         "estimated_tokens_out": tokens_out,
         "estimated_cost_usd": est_cost,
     }
+    return base, tokens_in, est_cost
 
-    # Ordered cheapest-check-first, and most-severe-signal-first among equals.
-    # Burst leads because it is the strongest indicator of a hijacked agent.
-    if requests_last_min >= policy["max_requests_per_min"]:
-        return Verdict(
-            decision="block",
-            reason=(
-                f"Request rate {requests_last_min}/min exceeds the limit of "
-                f"{policy['max_requests_per_min']}/min. This pattern is consistent "
-                f"with a compromised or looping agent."
-            ),
-            risk_level="high",
-            metadata=base,
-            incident={
-                "severity": "high",
-                "title": f"Abnormal request burst: {requests_last_min}/min",
-                "evidence": base | {"threshold": policy["max_requests_per_min"]},
-            },
-        )
 
+def check_request_limits(
+    base: dict[str, Any], tokens_in: int, est_cost: float, policy: dict[str, Any]
+) -> Verdict | None:
+    """Limits this request breaches on its own. None means "carry on"."""
     if tokens_in > policy["max_request_tokens"]:
         return Verdict(
             decision="block",
@@ -152,24 +141,54 @@ def evaluate_llm(
             metadata=base,
         )
 
-    if spend_today + est_cost > policy["daily_budget_usd"]:
-        return Verdict(
-            decision="block",
-            reason=(
-                f"Daily budget exhausted. Spent ${spend_today:.4f} of "
-                f"${policy['daily_budget_usd']:.2f}; this request would add "
-                f"${est_cost:.4f}."
-            ),
-            risk_level="high",
-            metadata=base,
-            incident={
-                "severity": "medium",
-                "title": "Daily budget exhausted",
-                "evidence": base | {"spend_today_usd": spend_today},
-            },
-        )
+    return None
 
-    # Approaching the ceiling is worth surfacing before it bites.
+
+def rate_exceeded(
+    base: dict[str, Any], requests_last_min: int, policy: dict[str, Any]
+) -> Verdict:
+    """A burst is the strongest single indicator of a hijacked agent."""
+    return Verdict(
+        decision="block",
+        reason=(
+            f"Request rate {requests_last_min}/min exceeds the limit of "
+            f"{policy['max_requests_per_min']}/min. This pattern is consistent "
+            f"with a compromised or looping agent."
+        ),
+        risk_level="high",
+        metadata=base,
+        incident={
+            "severity": "high",
+            "title": f"Abnormal request burst: {requests_last_min}/min",
+            "evidence": base | {"threshold": policy["max_requests_per_min"]},
+        },
+    )
+
+
+def budget_exceeded(
+    base: dict[str, Any], spend_today: float, est_cost: float, policy: dict[str, Any]
+) -> Verdict:
+    return Verdict(
+        decision="block",
+        reason=(
+            f"Daily budget exhausted. Spent ${spend_today:.4f} of "
+            f"${policy['daily_budget_usd']:.2f}; this request would add "
+            f"${est_cost:.4f}."
+        ),
+        risk_level="high",
+        metadata=base,
+        incident={
+            "severity": "medium",
+            "title": "Daily budget exhausted",
+            "evidence": base | {"spend_today_usd": spend_today},
+        },
+    )
+
+
+def within_limits(
+    base: dict[str, Any], spend_today: float, est_cost: float, policy: dict[str, Any]
+) -> Verdict:
+    """Reserved successfully. Approaching the ceiling is still worth saying."""
     if spend_today + est_cost > policy["daily_budget_usd"] * 0.8:
         return Verdict(
             decision="flag",
