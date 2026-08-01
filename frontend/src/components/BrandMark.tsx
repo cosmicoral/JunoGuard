@@ -38,13 +38,12 @@ export function BrandMark({ className, size = 32, suspended }: BrandProps) {
 }
 
 export function BrandLockup({ className, size = 28, suspended }: BrandProps) {
-  const color = tone(suspended);
-  const wordmarkSize = typeof size === "number" ? `${Math.max(11, size * 0.46)}px` : undefined;
+  const wordmarkSize = typeof size === "number" ? `${Math.max(12, size * 0.42)}px` : undefined;
   const style: CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    gap: "0.58em",
-    color,
+    gap: "0.62em",
+    color: "var(--text, #F8FAFC)",
   };
 
   return (
@@ -53,12 +52,13 @@ export function BrandLockup({ className, size = 28, suspended }: BrandProps) {
       <span
         aria-hidden="true"
         style={{
-          color,
-          fontFamily: "var(--mono)",
+          color: "inherit",
+          fontFamily: "var(--sans)",
           fontSize: wordmarkSize,
           fontWeight: 700,
-          letterSpacing: "0.18em",
+          letterSpacing: "0.14em",
           lineHeight: 1,
+          textTransform: "uppercase",
         }}
       >
         JUNOGUARD
