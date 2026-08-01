@@ -1,7 +1,8 @@
-# JunoGuard — dashboard
+# JunoGuard — site and live dashboard
 
-One screen. No routes, no login, no settings. Everything Juno decides shows up
-here, both lanes interleaved in a single feed, and one button closes the gate.
+The root route is JunoGuard's product landing page. The operational demo lives
+at `/dashboard`: everything Juno decides appears there, both lanes interleaved
+in a single feed, and one button closes the gate.
 
 ```bash
 npm install
@@ -55,7 +56,9 @@ entire Lane B argument in one glyph.
 
 ```
 src/
-  App.tsx                 shell, kill-switch screen state
+  App.tsx                 landing/dashboard route selection
+  Landing.tsx             product landing page
+  Dashboard.tsx           dashboard shell and kill-switch screen state
   lib/useJuno.ts          state, mock timer, Realtime subscriptions, rollups
   lib/mock.ts             seed data, emitters, the two demo set pieces
   lib/supabase.ts         client; decides mock vs live from env
