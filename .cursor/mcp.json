@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "junoguard": {
+      "command": "/Users/chilumbam/TokenGuard/mcp/.venv/bin/python",
+      "args": ["-m", "juno_mcp"],
+      "env": {
+        "JUNO_API_URL": "http://localhost:8000",
+        "JUNO_PROJECT_KEY": "jg_demo_key_cursorhack2026",
+        "JUNO_MOCK": "0"
+      }
+    }
+  }
+}
