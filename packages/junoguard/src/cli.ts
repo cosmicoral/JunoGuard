@@ -158,17 +158,23 @@ async function cmdScan(argv: string[]): Promise<number> {
 const UNSCANNABLE = /^(-|\.|\/|~|file:|git\+|git:|https?:)/;
 
 /** Our own flags, stripped before anything is handed to npm or pip. */
-const OWN_FLAGS = new Set(["--allow-unscanned", "--reason", "--operator"]);
+const OWN_FLAGS = new Set([
+  "--allow-unscanned",
+  "--allow-flagged",
+  "--reason",
+  "--operator",
+]);
 
 interface Override {
   allowed: boolean;
+  allowFlagged: boolean;
   reason?: string;
   operator?: string;
 }
 
 function extractOverride(tokens: string[]): { rest: string[]; override: Override } {
   const rest: string[] = [];
-  const override: Override = { allowed: false };
+  const override: Override = { allowed: false, allowFlagged: false };
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i]!;
     if (!OWN_FLAGS.has(token)) {
@@ -176,6 +182,7 @@ function extractOverride(tokens: string[]): { rest: string[]; override: Override
       continue;
     }
     if (token === "--allow-unscanned") override.allowed = true;
+    if (token === "--allow-flagged") override.allowFlagged = true;
     if (token === "--reason") override.reason = tokens[++i];
     if (token === "--operator") override.operator = tokens[++i];
   }
@@ -217,16 +224,38 @@ function refuseUnscannable(
   return EXIT_UNSCANNABLE;
 }
 
+function refuseFlagged(packages: string[], manager: string): number {
+  err([
+    [["", ""]],
+    [[`JUNO · REFUSED — FLAGGED PACKAGE`, "block"]],
+    [[``, ""]],
+    [[`Flagged packages are not clean enough to install unattended:`, ""]],
+    [[`  ${packages.join(", ")}`, "key"]],
+    [[`${manager} was not run.`, "block"]],
+    [[``, ""]],
+    [[`A named human can accept the risk with an audited override:`, "dim"]],
+    [
+      [
+        `  juno ${manager} install … --allow-flagged --reason "<why>" --operator "<you>"`,
+        "key",
+      ],
+    ],
+  ]);
+  return EXIT_BLOCKED;
+}
+
 async function recordOverride(
   sources: string[],
   ecosystem: Ecosystem,
   manager: string,
   override: Override,
+  kind: "unscanned" | "flagged" = "unscanned",
 ): Promise<boolean> {
   const operator = override.operator ?? process.env.JUNO_OPERATOR;
+  const flag = kind === "flagged" ? "--allow-flagged" : "--allow-unscanned";
   if (!override.reason || !operator) {
     err([
-      [[`--allow-unscanned needs both --reason and --operator.`, "block"]],
+      [[`${flag} needs both --reason and --operator.`, "block"]],
       [[`  (--operator may come from the JUNO_OPERATOR environment variable.)`, "dim"]],
     ]);
     return false;
@@ -289,8 +318,11 @@ async function cmdForward(
 
   const client = new JunoClient();
   const blocked: string[] = [];
+  const flagged: string[] = [];
   for (const pkg of packages) {
-    if ((await scanOne(client, pkg, ecosystem)) === "block") blocked.push(pkg);
+    const decision = await scanOne(client, pkg, ecosystem);
+    if (decision === "block") blocked.push(pkg);
+    else if (decision === "flag") flagged.push(pkg);
   }
 
   if (blocked.length) {
@@ -300,6 +332,23 @@ async function cmdForward(
       "block",
     );
     return EXIT_BLOCKED;
+  }
+
+  // A flag is a proceedable gateway decision for operators watching the feed,
+  // not permission for an unattended CLI install to reach disk.
+  if (flagged.length) {
+    if (!override.allowFlagged) return refuseFlagged(flagged, manager);
+    if (
+      !(await recordOverride(
+        flagged.map((pkg) => `flagged:${pkg}`),
+        ecosystem,
+        manager,
+        override,
+        "flagged",
+      ))
+    ) {
+      return EXIT_BLOCKED;
+    }
   }
 
   return exec([...argv0, ...rest], manager);
@@ -624,11 +673,13 @@ ${pc.bold("SCAN")}
   --ecosystem, -e <npm|pypi>
   --package-version <version>
 
-${pc.bold("UNSCANNABLE INSTALLS")}
+${pc.bold("UNSCANNABLE / FLAGGED INSTALLS")}
   Lockfile installs and path, URL or Git sources cannot be scanned by name, so
-  they are refused. To take responsibility for one:
-  --allow-unscanned         proceed anyway
-  --reason "<why>"          required with --allow-unscanned
+  they are refused. Flagged packages are also refused for unattended installs.
+  To take responsibility:
+  --allow-unscanned         proceed for unscannable sources
+  --allow-flagged           proceed for packages the gateway flagged
+  --reason "<why>"          required with either override
   --operator "<you>"        required; or set JUNO_OPERATOR
   The override is recorded against the project. If it cannot be recorded, the
   install does not happen.

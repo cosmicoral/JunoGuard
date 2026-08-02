@@ -161,7 +161,9 @@ juno watch                     # tail the live decision feed
 
 `juno npm|pnpm install` adds `--ignore-scripts` by default so an allowed
 package still cannot run host lifecycle scripts unless you pass
-`--no-ignore-scripts` deliberately.
+`--no-ignore-scripts` deliberately. Flagged packages are refused for
+unattended installs; proceed only with
+`--allow-flagged --reason … --operator …`.
 
 The forwarder is the one that matters. It scans every named package and only
 shells out to the real package manager if all of them come back clean:

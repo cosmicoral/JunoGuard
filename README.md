@@ -211,6 +211,7 @@ what is still an intention.
 | Scanner outage refuses the install | **live** | `ossprey.py`, `risk.py` |
 | Unscannable sources refused, audited override | **live** | `packages/junoguard/src/cli.ts`, `POST /v1/guard/unscanned` |
 | Guarded npm / pnpm / yarn / pip forwarders | **live** | `juno npm|pnpm|yarn …`, `juno pip …` in TypeScript and Python CLIs |
+| Flagged installs refused without override | **live** | CLI/wrap only proceed on `allow`; `--allow-flagged` records an audited exception |
 | Token, per-request and daily budget caps | **live** | `risk.py`, atomic reserve in `store.py` |
 | Burst / rate limiting | **live** | `store.reserve`, SQL `reserve_action` |
 | Kill switch with operator roles and audit | **live** | `auth.py`, `control_events` |

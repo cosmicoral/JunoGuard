@@ -140,12 +140,12 @@ def _split_tokens(tokens: list[str]) -> tuple[list[str], list[str]]:
 
 
 # Our own flags, stripped before anything reaches npm or pip.
-_OWN_FLAGS = {"--allow-unscanned", "--reason", "--operator"}
+_OWN_FLAGS = {"--allow-unscanned", "--allow-flagged", "--reason", "--operator"}
 
 
 def _extract_override(tokens: list[str]) -> tuple[list[str], dict[str, str | bool]]:
     rest: list[str] = []
-    override: dict[str, str | bool] = {"allowed": False}
+    override: dict[str, str | bool] = {"allowed": False, "allow_flagged": False}
     index = 0
     while index < len(tokens):
         token = tokens[index]
@@ -153,6 +153,8 @@ def _extract_override(tokens: list[str]) -> tuple[list[str], dict[str, str | boo
             rest.append(token)
         elif token == "--allow-unscanned":
             override["allowed"] = True
+        elif token == "--allow-flagged":
+            override["allow_flagged"] = True
         else:
             index += 1
             if index < len(tokens):
@@ -190,13 +192,33 @@ def _refuse_unscannable(sources: list[str], manager: str, kind: str) -> typer.Ex
     return typer.Exit(EXIT_UNSCANNABLE)
 
 
+def _refuse_flagged(packages: list[str], manager: str) -> typer.Exit:
+    console.print()
+    console.print("JUNO · REFUSED — FLAGGED PACKAGE", style=S_BLOCK)
+    console.print()
+    console.print("Flagged packages are not clean enough to install unattended:")
+    console.print(f"  {', '.join(packages)}")
+    console.print(f"{manager} was not run.", style=S_BLOCK)
+    console.print()
+    console.print("A named human can accept the risk with an audited override:", style=S_DIM)
+    console.print(
+        f'  juno {manager} install … --allow-flagged --reason "<why>" --operator "<you>"'
+    )
+    return typer.Exit(EXIT_BLOCKED)
+
+
 def _record_override(
-    sources: list[str], ecosystem: str, manager: str, override: dict[str, str | bool]
+    sources: list[str],
+    ecosystem: str,
+    manager: str,
+    override: dict[str, str | bool],
+    kind: str = "unscanned",
 ) -> bool:
     reason = override.get("reason")
     operator = override.get("operator") or os.environ.get("JUNO_OPERATOR")
+    flag = "--allow-flagged" if kind == "flagged" else "--allow-unscanned"
     if not reason or not operator:
-        console.print("--allow-unscanned needs both --reason and --operator.", style=S_BLOCK)
+        console.print(f"{flag} needs both --reason and --operator.", style=S_BLOCK)
         console.print(
             "  (--operator may come from the JUNO_OPERATOR environment variable.)", style=S_DIM
         )
@@ -245,7 +267,14 @@ def _forward(ctx: typer.Context, ecosystem: str, argv: list[str], manager: str) 
         raise typer.Exit(EXIT_UNSCANNABLE)
 
     client = JunoClient()
-    blocked = [p for p in packages if _scan_one(client, p, ecosystem, None) == "block"]
+    blocked: list[str] = []
+    flagged: list[str] = []
+    for package in packages:
+        decision = _scan_one(client, package, ecosystem, None)
+        if decision == "block":
+            blocked.append(package)
+        elif decision == "flag":
+            flagged.append(package)
 
     if blocked:
         console.print(
@@ -254,6 +283,20 @@ def _forward(ctx: typer.Context, ecosystem: str, argv: list[str], manager: str) 
             style=S_BLOCK,
         )
         raise typer.Exit(EXIT_BLOCKED)
+
+    # A flag is a proceedable gateway decision for operators watching the feed,
+    # not permission for an unattended CLI install to reach disk.
+    if flagged:
+        if not override.get("allow_flagged"):
+            raise _refuse_flagged(flagged, manager)
+        if not _record_override(
+            [f"flagged:{package}" for package in flagged],
+            ecosystem,
+            manager,
+            override,
+            "flagged",
+        ):
+            raise typer.Exit(EXIT_BLOCKED)
 
     _exec([*argv, *tokens], manager)
 

@@ -29,6 +29,16 @@ test("pnpm forwarder refuses a mock-blocked package before spawning", async () =
   assert.equal(code, 2);
 });
 
+test("npm forwarder refuses a mock-flagged package before spawning", async () => {
+  process.env.JUNO_MOCK = "1";
+  silence();
+  const code = await main(["npm", "install", "@ossprey/suspicious-package"], {
+    name: "@heysalad/junoguard",
+    version: "0.0.0-test",
+  });
+  assert.equal(code, 2);
+});
+
 test("yarn lockfile install is refused without an override", async () => {
   process.env.JUNO_MOCK = "1";
   silence();
