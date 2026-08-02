@@ -26,8 +26,23 @@ export interface BlastRadius {
   summary?: string;
 }
 
+export interface CycloneDxSbom {
+  bomFormat: "CycloneDX";
+  specVersion: string;
+  serialNumber?: string;
+  metadata?: {
+    component?: {
+      name?: string;
+      version?: string;
+      purl?: string;
+    };
+  };
+}
+
 export interface InstallResult extends Envelope {
   verdict?: Verdict;
+  /** Registry-backed package identity. Null in offline fixture mode. */
+  sbom?: CycloneDxSbom | null;
   /** Null when the decision is allow. */
   blast_radius?: BlastRadius | null;
   /** Set when the refusal is "we could not look", not "we found something". */

@@ -59,6 +59,18 @@ Lane A. Called before a package reaches disk.
     "available": true,         // false when no scan happened at all
     "findings": ["Obfuscated postinstall script", "Outbound POST on install"]
   },
+  "sbom": {
+    "bomFormat": "CycloneDX",
+    "specVersion": "1.6",
+    "serialNumber": "urn:uuid:…",
+    "metadata": {
+      "component": {
+        "name": "@ossprey/test-package",
+        "version": "1.0.0",
+        "purl": "pkg:npm/%40ossprey/test-package@1.0.0"
+      }
+    }
+  },
   "blast_radius": {
     "credentials_in_scope": ["OPENAI_API_KEY", "SUPABASE_SERVICE_ROLE_KEY"],
     "network_egress": "unrestricted",
@@ -69,6 +81,11 @@ Lane A. Called before a package reaches disk.
 ```
 
 `blast_radius` is null when the decision is `allow`.
+
+In live Ossprey mode, JunoGuard independently resolves the exact package
+coordinate from the npm registry or PyPI and generates a CycloneDX 1.6 SBOM.
+A clean malware verdict does not proceed if that registry identity cannot be
+documented. `sbom` is null in deterministic offline fixture mode.
 
 **Scanner unavailable.** `severity: "unknown"` means nobody has established a
 reputation for the package. `severity: "unavailable"` with `available: false`
@@ -345,7 +362,12 @@ es.addEventListener("expired",  () => reconnectWithFreshToken())
 ## `GET /health`
 
 ```jsonc
-{ "status": "ok", "service": "JunoGuard", "mode": "live" }
+{
+  "status": "ok",
+  "service": "JunoGuard",
+  "mode": "live",
+  "sbom": "registry"
+}
 ```
 
 `mode` is `mock` when no Ossprey or provider credentials are configured.

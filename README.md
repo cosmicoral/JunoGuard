@@ -128,6 +128,7 @@ Every package the agent tries to install is intercepted **before** it reaches di
   cannot step around is not implemented. `juno npm install` closes the gap for
   installs that go through it.
 - [Ossprey](https://ossprey.com) malware verdict
+- Registry-backed CycloneDX 1.6 SBOM for the exact package coordinate
 - Block on known-malicious, and on unknown by default
 - Sources that cannot be scanned — lockfile installs, local archives, Git and
   URL sources — are **refused**, not waved through. Proceeding takes a named
@@ -202,7 +203,7 @@ what is still an intention.
 | Ossprey verdicts without an API key | **mock** | `ossprey._mock_verdict` — deterministic fixtures |
 | Model provider calls without a key | **mock** | `provider.MOCK_ANSWER` |
 | Blast radius | **mock** | `backend/app/blast.py` — inferred from the local environment, not measured |
-| SBOM generation | **planned** | not implemented; the Ossprey adapter consumes a verdict, not an SBOM |
+| Registry-backed CycloneDX SBOM generation | **live** | `backend/app/sbom.py`; returned and audited with install decisions |
 | Sandbox detonation of flagged packages | **planned** | no sandbox worker exists |
 | Interception an agent cannot bypass | **planned** | MCP is advisory (see Lane A); no OS or package-manager boundary |
 
