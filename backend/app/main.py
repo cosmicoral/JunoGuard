@@ -264,6 +264,7 @@ def health() -> dict[str, Any]:
         "environment": config.JUNO_ENV,
         "store": "supabase" if isinstance(store, store_module.SupabaseStore) else "memory",
         "scanner": "ossprey" if config.USE_OSSPREY else "mock",
+        "sbom": "registry" if config.USE_OSSPREY else "disabled_in_mock_mode",
         "provider": "mock" if config.MOCK_PROVIDER or not config.PROVIDER_API_KEY else "live",
     }
 
@@ -331,6 +332,7 @@ def guard_install(
 
     body = _envelope(action_id, verdict, status) | {
         "verdict": verdict.metadata.get("verdict"),
+        "sbom": verdict.metadata.get("sbom"),
         "blast_radius": verdict.metadata.get("blast_radius"),
     }
 

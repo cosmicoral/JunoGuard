@@ -55,6 +55,74 @@ def test_scanner_outage_blocks_install(
     assert body["retry_after_seconds"] == risk.SCANNER_RETRY_AFTER_SECONDS
 
 
+# --- A clean install still requires an SBOM ---------------------------------
+
+
+def test_live_clean_install_returns_generated_sbom(
+    client: TestClient, agent_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(config, "USE_OSSPREY", True)
+    monkeypatch.setattr(
+        "app.risk.ossprey.scan",
+        lambda *a, **k: {
+            "available": True,
+            "severity": "clean",
+            "findings": [],
+            "source": "ossprey",
+            "version": "1.0.0",
+        },
+    )
+    document = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.6",
+        "metadata": {
+            "component": {
+                "name": "left-pad",
+                "version": "1.0.0",
+                "purl": "pkg:npm/left-pad@1.0.0",
+            }
+        },
+    }
+    generator = MagicMock(return_value=document)
+    monkeypatch.setattr("app.risk.sbom.generate", generator)
+
+    response = _install(client, agent_headers)
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "allow"
+    assert response.json()["sbom"] == document
+    generator.assert_called_once_with("left-pad", "npm", "1.0.0")
+
+
+def test_live_clean_install_blocks_when_sbom_generation_fails(
+    client: TestClient, agent_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.sbom import SbomError
+
+    monkeypatch.setattr(config, "USE_OSSPREY", True)
+    monkeypatch.setattr(
+        "app.risk.ossprey.scan",
+        lambda *a, **k: {
+            "available": True,
+            "severity": "clean",
+            "findings": [],
+            "source": "ossprey",
+            "version": "1.0.0",
+        },
+    )
+    monkeypatch.setattr(
+        "app.risk.sbom.generate",
+        MagicMock(side_effect=SbomError("registry metadata unavailable")),
+    )
+
+    response = _install(client, agent_headers)
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "block"
+    assert response.json()["review_required"] is True
+    assert response.json()["sbom"] is None
+
+
 # --- Charged flags count toward spend (JG-003) ------------------------------
 
 

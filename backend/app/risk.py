@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from . import blast, ossprey, pricing
+from . import blast, config, ossprey, pricing, sbom
 
 Decision = Literal["allow", "flag", "block"]
 Risk = Literal["low", "medium", "high", "critical"]
@@ -77,16 +77,51 @@ def evaluate_install(
             },
         )
 
+    document: dict[str, Any] | None = None
+    sbom_error: str | None = None
+    if config.USE_OSSPREY:
+        try:
+            document = sbom.generate(package, ecosystem, verdict.get("version") or version)
+        except sbom.SbomError as exc:
+            sbom_error = str(exc)
+
+    # A clean verdict for one named package does not cover a component whose
+    # identity could not be established independently from registry metadata.
+    # Fail closed instead of recording an SBOM capability that did not run.
+    if severity == "clean" and sbom_error:
+        return Verdict(
+            decision="block",
+            reason=(
+                f"{package} was NOT installed. Ossprey found no malware, but "
+                f"JunoGuard could not generate the package SBOM: {sbom_error}. "
+                f"Retry when the registry is reachable."
+            ),
+            risk_level="high",
+            metadata={
+                "verdict": verdict,
+                "sbom": None,
+                "sbom_error": sbom_error,
+                "blast_radius": None,
+                "review_required": True,
+                "retry_after_seconds": SCANNER_RETRY_AFTER_SECONDS,
+            },
+        )
+
     if severity == "clean":
         return Verdict(
             decision="allow",
             reason=f"{package} cleared by Ossprey.",
             risk_level="low",
-            metadata={"verdict": verdict, "blast_radius": None},
+            metadata={"verdict": verdict, "sbom": document, "blast_radius": None},
         )
 
     radius = blast.compute(package, findings)
-    metadata = {"verdict": verdict, "blast_radius": radius}
+    metadata = {
+        "verdict": verdict,
+        "sbom": document,
+        "blast_radius": radius,
+        **({"sbom_error": sbom_error} if sbom_error else {}),
+    }
 
     if ossprey.at_least(severity, policy["block_severity"]):
         detail = findings[0] if findings else "flagged by Ossprey"
