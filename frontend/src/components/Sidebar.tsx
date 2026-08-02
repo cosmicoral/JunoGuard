@@ -9,6 +9,13 @@ const NAV_ITEMS: { id: DashboardSection; label: string }[] = [
   { id: "controls", label: "Controls" },
 ];
 
+export const PRODUCT_LINKS = [
+  { href: "/#product", label: "Product overview" },
+  { href: "/#how", label: "How it works" },
+  { href: "/#architecture", label: "Architecture" },
+  { href: "/#install", label: "Install guide" },
+] as const;
+
 export function Sidebar({
   activeSection,
   suspended,
@@ -70,10 +77,13 @@ export function Sidebar({
 
       <nav className="sidebar-explore" aria-label="Product navigation">
         <p className="sidebar-nav-label">Explore</p>
-        <a href="/">Product website <span>↗</span></a>
-        <a href="/#install">Setup guide <span>↗</span></a>
+        {PRODUCT_LINKS.map((link) => (
+          <a href={link.href} key={link.href}>
+            {link.label} <span aria-hidden="true">→</span>
+          </a>
+        ))}
         <a href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">
-          Source code <span>↗</span>
+          Source code <span aria-hidden="true">↗</span>
         </a>
       </nav>
 

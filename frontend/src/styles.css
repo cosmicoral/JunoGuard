@@ -1686,6 +1686,14 @@ body[data-suspended="true"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .sidebar-explore {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sidebar-explore > .sidebar-nav-label {
+    grid-column: 1 / -1;
+  }
+
   .dashboard-main {
     overflow: visible;
     padding-right: 0;

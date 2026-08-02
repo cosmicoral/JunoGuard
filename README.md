@@ -210,7 +210,7 @@ what is still an intention.
 | Token, per-request and daily budget caps | **live** | `risk.py`, atomic reserve in `store.py` |
 | Burst / rate limiting | **live** | `store.reserve`, SQL `reserve_action` |
 | Kill switch with operator roles and audit | **live** | `auth.py`, `control_events` |
-| Live dashboard, install evidence, Supabase Realtime and SSE | **live** | `frontend/`, `POST /v1/events/token` |
+| Live dashboard, install evidence, signed-in product navigation, Supabase Realtime and SSE | **live** | `frontend/`, `POST /v1/events/token` |
 | Ossprey verdicts without an API key | **mock** | `ossprey._mock_verdict` — deterministic fixtures |
 | Model provider calls without a key | **mock** | `provider.MOCK_ANSWER` |
 | Agent-scoped blast radius | **live (client-declared)** | Clients report names-only local scope; `backend/app/blast.py` enriches it with scanner and sandbox evidence |
