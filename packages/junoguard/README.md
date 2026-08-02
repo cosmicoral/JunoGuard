@@ -31,7 +31,7 @@ checked first.
 > **MCP enforcement is advisory.** It works by the agent choosing to call the
 > tool. Nothing at the OS or package-manager level stops an agent that shells out
 > to `npm install` directly, and this package does not claim otherwise. Use
-> `juno npm install` / `juno pip install` in scripts and CI where you control the
+> `juno npm|pnpm|yarn install` / `juno pip install` in scripts and CI where you control the
 > command, and treat the MCP server as policy the agent is asked to respect
 > rather than a boundary it cannot cross.
 >
@@ -150,6 +150,8 @@ juno status                    # budget, spend, rate limit, incidents
 juno scan express              # scan without installing
 juno scan requests -e pypi     # scan a PyPI package
 juno npm install react zod     # scan, then run the real npm
+juno pnpm add react zod        # scan, then run the real pnpm
+juno yarn add react zod        # scan, then run the real yarn
 juno pip install requests      # scan, then run the real pip
 juno watch                     # tail the live decision feed
 ```

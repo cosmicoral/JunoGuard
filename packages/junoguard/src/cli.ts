@@ -1,11 +1,11 @@
 /**
  * `juno` — JunoGuard on the command line.
  *
- * The forwarders (`juno npm install`, `juno pip install`) are the point: scan
- * first, and only spawn the real package manager if every package came back
- * clean. A block prints the refusal, exits non-zero, and never reaches npm or
- * pip. So does an unreachable gateway — a guard that cannot be consulted is
- * not permission to proceed.
+ * The forwarders (`juno npm|pnpm|yarn install`, `juno pip install`) are the
+ * point: scan first, and only spawn the real package manager if every package
+ * came back clean. A block prints the refusal, exits non-zero, and never
+ * reaches the package manager. So does an unreachable gateway — a guard that
+ * cannot be consulted is not permission to proceed.
  *
  * Argument parsing is hand-rolled rather than delegated to a parser, because
  * the forwarder must hand npm its flags in the user's original order and every
@@ -487,6 +487,8 @@ ${pc.bold("COMMANDS")}
   status                    budget, spend, rate limit, open incidents
   scan <package>            scan a package without installing it
   npm install <pkg>...      scan, then run the real npm if all are clean
+  pnpm install <pkg>...     scan, then run the real pnpm if all are clean
+  yarn add <pkg>...         scan, then run the real yarn if all are clean
   pip install <pkg>...      scan, then run the real pip if all are clean
   watch                     tail the live decision feed
   init [agent]...           wire junoguard into an AI coding agent
@@ -569,20 +571,42 @@ export async function main(
     }
 
     case "npm":
+    case "pnpm":
+    case "yarn":
     case "pip": {
       const [sub, ...tokens] = rest;
-      const isNpm = command === "npm";
-      const verbs = isNpm ? ["install", "i", "add"] : ["install"];
-      if (!sub || !verbs.includes(sub)) {
-        say(`usage: juno ${command} install <package>...`, "flag");
+      const forwarders: Record<
+        string,
+        { ecosystem: Ecosystem; verbs: string[]; argv: (verb: string) => string[] }
+      > = {
+        npm: {
+          ecosystem: "npm",
+          verbs: ["install", "i", "add"],
+          argv: () => ["npm", "install"],
+        },
+        pnpm: {
+          ecosystem: "npm",
+          verbs: ["install", "i", "add"],
+          argv: (verb) => ["pnpm", verb === "i" ? "install" : verb],
+        },
+        yarn: {
+          ecosystem: "npm",
+          verbs: ["add", "install"],
+          argv: (verb) => ["yarn", verb],
+        },
+        pip: {
+          ecosystem: "pypi",
+          verbs: ["install"],
+          argv: () => ["pip", "install"],
+        },
+      };
+      const forwarder = forwarders[command]!;
+      if (!sub || !forwarder.verbs.includes(sub)) {
+        const preferred = command === "yarn" ? "add" : "install";
+        say(`usage: juno ${command} ${preferred} <package>...`, "flag");
         return 1;
       }
-      return cmdForward(
-        tokens,
-        isNpm ? "npm" : "pypi",
-        isNpm ? ["npm", "install"] : ["pip", "install"],
-        command,
-      );
+      return cmdForward(tokens, forwarder.ecosystem, forwarder.argv(sub), command);
     }
 
     default:

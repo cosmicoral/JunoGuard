@@ -1,10 +1,10 @@
 """`juno` — JunoGuard on the command line.
 
-The forwarders (`juno npm install`, `juno pip install`) are the point: scan
-first, and only shell out to the real package manager if every package came
-back clean. A block prints the refusal, exits non-zero, and never reaches npm
-or pip. So does an unreachable gateway — a guard that cannot be consulted is
-not permission to proceed.
+The forwarders (`juno npm|pnpm|yarn install`, `juno pip install`) are the
+point: scan first, and only shell out to the real package manager if every
+package came back clean. A block prints the refusal, exits non-zero, and never
+reaches the package manager. So does an unreachable gateway — a guard that
+cannot be consulted is not permission to proceed.
 """
 
 from __future__ import annotations
@@ -38,9 +38,15 @@ app = typer.Typer(
 )
 npm_app = typer.Typer(no_args_is_help=True, add_completion=False, rich_markup_mode=None,
                       help="npm, guarded.")
+pnpm_app = typer.Typer(no_args_is_help=True, add_completion=False, rich_markup_mode=None,
+                       help="pnpm, guarded.")
+yarn_app = typer.Typer(no_args_is_help=True, add_completion=False, rich_markup_mode=None,
+                       help="yarn, guarded.")
 pip_app = typer.Typer(no_args_is_help=True, add_completion=False, rich_markup_mode=None,
                       help="pip, guarded.")
 app.add_typer(npm_app, name="npm")
+app.add_typer(pnpm_app, name="pnpm")
+app.add_typer(yarn_app, name="yarn")
 app.add_typer(pip_app, name="pip")
 
 _FORWARD_FLAGS = {"allow_extra_args": True, "ignore_unknown_options": True}
@@ -276,6 +282,44 @@ def npm_install(ctx: typer.Context) -> None:
 def npm_add(ctx: typer.Context) -> None:
     """Alias for `juno npm install`."""
     _forward(ctx, "npm", ["npm", "install"], "npm")
+
+
+@pnpm_app.command("install", context_settings=_FORWARD_FLAGS)
+def pnpm_install(ctx: typer.Context) -> None:
+    """Usage: juno pnpm install PACKAGE... [PNPM FLAGS]
+
+    Scans every named package against the npm ecosystem, then runs the real
+    pnpm install only if all of them come back clean.
+    """
+    _forward(ctx, "npm", ["pnpm", "install"], "pnpm")
+
+
+@pnpm_app.command("add", context_settings=_FORWARD_FLAGS, hidden=True)
+def pnpm_add(ctx: typer.Context) -> None:
+    """Alias that preserves `pnpm add` semantics."""
+    _forward(ctx, "npm", ["pnpm", "add"], "pnpm")
+
+
+@pnpm_app.command("i", context_settings=_FORWARD_FLAGS, hidden=True)
+def pnpm_i(ctx: typer.Context) -> None:
+    """Alias for `juno pnpm install`."""
+    _forward(ctx, "npm", ["pnpm", "install"], "pnpm")
+
+
+@yarn_app.command("add", context_settings=_FORWARD_FLAGS)
+def yarn_add(ctx: typer.Context) -> None:
+    """Usage: juno yarn add PACKAGE... [YARN FLAGS]
+
+    Scans every named package against the npm ecosystem, then runs the real
+    yarn add only if all of them come back clean.
+    """
+    _forward(ctx, "npm", ["yarn", "add"], "yarn")
+
+
+@yarn_app.command("install", context_settings=_FORWARD_FLAGS, hidden=True)
+def yarn_install(ctx: typer.Context) -> None:
+    """Lockfile or named-package yarn install, guarded."""
+    _forward(ctx, "npm", ["yarn", "install"], "yarn")
 
 
 @pip_app.command("install", context_settings=_FORWARD_FLAGS)
