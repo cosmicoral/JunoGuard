@@ -74,6 +74,7 @@ Lane A. Called before a package reaches disk.
   "sandbox": {
     "status": "completed",
     "engine": "docker",
+    "artifact_kind": "npm-tarball", // npm-tarball | pypi-sdist | pypi-wheel
     "scripts_executed": [
       { "lifecycle": "postinstall", "exit_code": 0, "timed_out": false }
     ],
@@ -103,14 +104,17 @@ coordinate from the npm registry or PyPI and generates a CycloneDX 1.6 SBOM.
 A clean malware verdict does not proceed if that registry identity cannot be
 documented. `sbom` is null in deterministic offline fixture mode.
 
-When `SANDBOX_ENABLED=true`, every non-clean npm verdict is detonated before a
-proceedable flag is returned. The gateway downloads the registry tarball,
-verifies its published digest, and mounts only that artifact into the
-resource-bounded worker. Network, Linux capabilities, writable root storage,
-gateway credentials, and project files are absent. Concerning observations,
-timeouts, and worker failures promote an otherwise proceedable flag to a block.
-The static Ossprey policy remains authoritative when it already requires a
-block. `sandbox` is null for clean packages and while the feature is disabled.
+When `SANDBOX_ENABLED=true`, every non-clean npm or PyPI verdict is detonated
+before a proceedable flag is returned. The gateway downloads the registry
+artifact, verifies its published digest, and mounts only that artifact into an
+ecosystem-specific resource-bounded worker. npm executes lifecycle scripts.
+PyPI safely extracts an sdist (preferred) or pure `py3-none-any` wheel, then
+runs offline build, install, and declared top-level import steps. Network, Linux
+capabilities, writable root storage, gateway credentials, and project files are
+absent. Concerning observations, timeouts, and worker failures promote an
+otherwise proceedable flag to a block. The static Ossprey policy remains
+authoritative when it already requires a block. `sandbox` is null for clean
+packages and while the feature is disabled.
 
 **Scanner unavailable.** `severity: "unknown"` means nobody has established a
 reputation for the package. `severity: "unavailable"` with `available: false`

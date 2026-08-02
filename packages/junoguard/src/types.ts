@@ -44,6 +44,7 @@ export interface SandboxEvidence {
   engine?: "docker";
   package?: string;
   version?: string;
+  artifact_kind?: "npm-tarball" | "pypi-sdist" | "pypi-wheel";
   scripts_executed?: Array<{
     lifecycle: string;
     exit_code?: number | null;
@@ -69,7 +70,7 @@ export interface InstallResult extends Envelope {
   verdict?: Verdict;
   /** Registry-backed package identity. Null in offline fixture mode. */
   sbom?: CycloneDxSbom | null;
-  /** Isolated npm lifecycle evidence when sandbox detonation is enabled. */
+  /** Isolated npm lifecycle or PyPI build/install evidence when enabled. */
   sandbox?: SandboxEvidence | null;
   /** Null when the decision is allow. */
   blast_radius?: BlastRadius | null;

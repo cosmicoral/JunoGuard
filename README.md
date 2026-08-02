@@ -111,10 +111,11 @@ Every hot-path decision is deterministic: package verdicts, token estimation, co
 Additional LLM calls on the hot path:  0
 ```
 
-There is no AI on the hot path or in sandbox analysis. When the optional npm
-sandbox is enabled, non-clean packages take a bounded, deterministic container
-detonation step before a proceedable flag is returned. The package code runs in
-the isolated worker image, never in the gateway process. See
+There is no AI on the hot path or in sandbox analysis. When the optional
+sandbox is enabled, non-clean npm and PyPI packages take a bounded,
+deterministic container detonation step before a proceedable flag is returned.
+The package code runs in an ecosystem-specific isolated worker image, never in
+the gateway process. See
 [What is actually implemented](#what-is-actually-implemented).
 
 ---
@@ -131,8 +132,9 @@ Every package the agent tries to install is intercepted **before** it reaches di
   installs that go through it.
 - [Ossprey](https://ossprey.com) malware verdict
 - Registry-backed CycloneDX 1.6 SBOM for the exact package coordinate
-- Optional Docker detonation of non-clean npm lifecycle scripts with no network,
-  no capabilities, bounded resources, and no project or credential mounts
+- Optional Docker detonation of non-clean npm lifecycle scripts and PyPI
+  build/install/import paths with no network, no capabilities, bounded
+  resources, and no project or credential mounts
 - Block on known-malicious, and on unknown by default
 - Sources that cannot be scanned — lockfile installs, local archives, Git and
   URL sources — are **refused**, not waved through. Proceeding takes a named
@@ -208,7 +210,7 @@ what is still an intention.
 | Model provider calls without a key | **mock** | `provider.MOCK_ANSWER` |
 | Blast radius | **mock** | `backend/app/blast.py` — inferred from the local environment, not measured |
 | Registry-backed CycloneDX SBOM generation | **live** | `backend/app/sbom.py`; returned and audited with install decisions |
-| Sandbox detonation of non-clean npm packages | **live (opt-in)** | `backend/app/sandbox.py`, hardened image in `sandbox/` |
+| Sandbox detonation of non-clean npm and PyPI packages | **live (opt-in)** | `backend/app/sandbox.py`, hardened images in `sandbox/` |
 | Interception an agent cannot bypass | **planned** | MCP is advisory (see Lane A); no OS or package-manager boundary |
 
 `GET /health` reports `mode: mock` whenever the Ossprey or provider credentials
@@ -309,11 +311,18 @@ Health check:
 curl http://localhost:8000/health
 ```
 
-Optional npm lifecycle detonation requires Docker and is off by default. Build
-the pinned worker image with `docker build -t junoguard-sandbox:latest sandbox`,
-then set `SANDBOX_ENABLED=true` on a gateway using a dedicated or rootless
-Docker daemon. See [`sandbox/README.md`](sandbox/README.md) for the boundary and
-operational limits.
+Optional npm and PyPI detonation requires Docker and is off by default. Build
+both pinned workers:
+
+```bash
+docker build -t junoguard-sandbox:latest sandbox
+docker build -f sandbox/Dockerfile.python \
+  -t junoguard-python-sandbox:latest sandbox
+```
+
+Then set `SANDBOX_ENABLED=true` on a gateway using a dedicated or rootless
+Docker daemon. See
+[`sandbox/README.md`](sandbox/README.md) for the boundary and operational limits.
 
 ---
 

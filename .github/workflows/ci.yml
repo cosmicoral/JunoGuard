@@ -40,6 +40,36 @@ jobs:
       - name: Verify migrations apply twice
         run: ./supabase/verify_migrations.sh
 
+  client:
+    name: TypeScript client audit and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/junoguard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/junoguard/package-lock.json
+      - run: npm ci
+      - name: npm audit (no high+)
+        run: npm audit --audit-level=high
+      - run: npm run build
+
+  sandbox:
+    name: Sandbox images and boundary canaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned npm worker
+        run: docker build -t junoguard-sandbox:latest sandbox
+      - name: Build pinned Python worker
+        run: docker build -f sandbox/Dockerfile.python -t junoguard-python-sandbox:latest sandbox
+      - name: Run networkless canaries
+        run: bash sandbox/run-canaries.sh
+
   frontend:
     name: Frontend audit, tests, build
     runs-on: ubuntu-latest
