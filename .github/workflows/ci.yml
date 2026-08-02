@@ -57,6 +57,7 @@ jobs:
       - name: npm audit (no high+)
         run: npm audit --audit-level=high
       - run: npm run build
+      - run: npm test
 
   sandbox:
     name: Sandbox images and boundary canaries

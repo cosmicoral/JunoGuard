@@ -38,6 +38,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/bin.ts",
+    "test": "node --test test/*.test.mjs",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

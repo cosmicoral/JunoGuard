@@ -10,6 +10,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { collectAgentScope } from "./scope.js";
 import type { Ecosystem, Envelope, InstallResult, LlmResult, StatusResult } from "./types.js";
 
 export const DEFAULT_API_URL = "http://localhost:8000";
@@ -113,6 +114,7 @@ export class JunoClient {
       package: pkg,
       ecosystem,
       version: version ?? null,
+      agent_scope: collectAgentScope(),
     });
   }
 
