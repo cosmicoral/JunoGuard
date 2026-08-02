@@ -20,7 +20,7 @@ from app.store import MemoryStore
 # The worker lives outside the backend package — it is deployed to Modal, not
 # imported by the gateway. Its report shaping is plain Python, so it is tested
 # here rather than only in production.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "modal"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "modal_worker"))
 import detonate as worker  # noqa: E402
 
 

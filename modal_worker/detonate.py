@@ -31,8 +31,8 @@ Secrets (never hardcoded):
       MODAL_DETONATE_TOKEN=...        # bearer this endpoint requires
       DETONATION_CALLBACK_TOKEN=...   # bearer we send back to the gateway
 
-Deploy:  modal deploy modal/detonate.py
-Dev:     modal serve modal/detonate.py
+Deploy:  modal deploy modal_worker/detonate.py
+Dev:     modal serve modal_worker/detonate.py
 
 Everything above `--- serving layer ---` is plain Python with no Modal imports,
 so the report shaping is unit-tested in backend/tests without a deployment.

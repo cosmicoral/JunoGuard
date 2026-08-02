@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Smoke test for the deployed detonation worker.
-#   ./modal/smoke.sh https://<you>--junoguard-detonation-web.modal.run [package]
+#   ./modal_worker/smoke.sh https://<you>--junoguard-detonation-web.modal.run [package]
 #
 # Detonates one package and prints the queued call id. The report itself is
 # delivered to the gateway's callback, not to this script.

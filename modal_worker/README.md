@@ -54,8 +54,8 @@ modal secret create junoguard-detonation \
     MODAL_DETONATE_TOKEN=$(openssl rand -hex 24) \
     DETONATION_CALLBACK_TOKEN=$(openssl rand -hex 24)
 
-modal deploy modal/detonate.py     # prints the URL -> MODAL_DETONATE_URL
-modal serve  modal/detonate.py     # hot-reload, temporary URL
+modal deploy modal_worker/detonate.py     # prints the URL -> MODAL_DETONATE_URL
+modal serve  modal_worker/detonate.py     # hot-reload, temporary URL
 ```
 
 Then in `backend/.env`:

@@ -176,7 +176,7 @@ raises an incident so the gap in coverage appears in review.
 
 ## `POST /v1/detonations/{action_id}`
 
-Callback for the Modal detonation worker (see [modal/](../modal)). Not for
+Callback for the Modal detonation worker (see [modal_worker/](../modal_worker)). Not for
 agents — it takes the worker's bearer token, never `X-Juno-Key`.
 
 ```jsonc
