@@ -49,6 +49,16 @@ USE_OSSPREY = bool(OSSPREY_API_KEY)
 NPM_REGISTRY_URL = os.getenv("NPM_REGISTRY_URL", "https://registry.npmjs.org").rstrip("/")
 PYPI_URL = os.getenv("PYPI_URL", "https://pypi.org").rstrip("/")
 
+# --- sandbox detonation ----------------------------------------------------
+# Disabled until the pinned image in /sandbox has been built on the gateway
+# host. When enabled, only suspicious npm packages enter this path.
+
+SANDBOX_ENABLED = _bool("SANDBOX_ENABLED", False)
+SANDBOX_IMAGE = os.getenv("SANDBOX_IMAGE", "junoguard-sandbox:latest")
+SANDBOX_DOCKER_BIN = os.getenv("SANDBOX_DOCKER_BIN", "docker")
+SANDBOX_TIMEOUT_SECONDS = _int("SANDBOX_TIMEOUT_SECONDS", 12)
+SANDBOX_MAX_ARTIFACT_BYTES = _int("SANDBOX_MAX_ARTIFACT_BYTES", 10 * 1024 * 1024)
+
 # --- Model provider ---------------------------------------------------------
 
 MOCK_PROVIDER = _bool("MOCK_PROVIDER", True)
