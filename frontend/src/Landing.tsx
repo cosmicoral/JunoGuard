@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { useAuth } from "./auth/AuthContext";
 import { BrandMark } from "./components/BrandMark";
 import { AGENT_MARKS, STACK_MARKS } from "./components/SystemMarks";
 
@@ -92,8 +93,11 @@ function DecisionConsole() {
 }
 
 export function Landing() {
+  const { loading, session } = useAuth();
   const reduce = useReducedMotion() ?? false;
   const reveal = reduce ? {} : { initial: { opacity: 0, y: 18 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: 0.2 }, transition: { duration: 0.55, ease: [0.23, 1, 0.32, 1] as const } };
+  const consoleHref = session ? "/dashboard" : "/auth/sign-in";
+  const consoleLabel = loading ? "Console" : session ? "Open console" : "Sign in";
 
   return (
     <main className="landing-shell">
@@ -107,9 +111,9 @@ export function Landing() {
           <a href="#how">How it works</a>
           <a href="#architecture">Architecture</a>
           <a href="#install">Install</a>
-          <a href="https://github.com/cosmicoral/TokenGuard" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">GitHub</a>
         </nav>
-        <a className="nav-console" href="/dashboard">Live console <span>↗</span></a>
+        <a className="nav-console" href={consoleHref}>{consoleLabel} <span>↗</span></a>
       </header>
 
       <section className="landing-hero" id="top">
@@ -127,8 +131,8 @@ export function Landing() {
             lands. One deterministic gate. Allow, flag, or stop.
           </p>
           <div className="hero-actions">
-            <a className="primary-action" href="/dashboard">
-              Open live console <span>→</span>
+            <a className="primary-action" href={consoleHref}>
+              {session ? "Open live console" : "Sign in to console"} <span>→</span>
             </a>
             <a className="text-action" href="#how">
               See the gate in action
@@ -272,8 +276,8 @@ export function Landing() {
         <p className="section-index">READY / 05</p>
         <h2>Give your agent<br />a line it cannot cross.</h2>
         <div>
-          <a className="primary-action" href="/dashboard">Launch the live console <span>→</span></a>
-          <a className="text-action" href="https://github.com/cosmicoral/TokenGuard" target="_blank" rel="noreferrer">Read the source on GitHub ↗</a>
+          <a className="primary-action" href={consoleHref}>{session ? "Launch the live console" : "Sign in to the console"} <span>→</span></a>
+          <a className="text-action" href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">Read the source on GitHub ↗</a>
         </div>
       </section>
 

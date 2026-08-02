@@ -48,10 +48,13 @@ export function Sidebar({
   return (
     <aside className="sidebar" data-suspended={suspended}>
       <div className="sidebar-brand">
-        <BrandLockup className="sidebar-lockup" size={30} suspended={suspended} />
+        <a href="/" aria-label="JunoGuard product home">
+          <BrandLockup className="sidebar-lockup" size={30} suspended={suspended} />
+        </a>
       </div>
 
       <nav className="sidebar-nav" aria-label="Dashboard sections">
+        <p className="sidebar-nav-label">Console</p>
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
@@ -63,6 +66,15 @@ export function Sidebar({
             {item.label}
           </button>
         ))}
+      </nav>
+
+      <nav className="sidebar-explore" aria-label="Product navigation">
+        <p className="sidebar-nav-label">Explore</p>
+        <a href="/">Product website <span>↗</span></a>
+        <a href="/#install">Setup guide <span>↗</span></a>
+        <a href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">
+          Source code <span>↗</span>
+        </a>
       </nav>
 
       <div className="sidebar-bottom">

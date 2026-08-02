@@ -46,6 +46,22 @@ export function SignIn() {
 
   return (
     <main className="auth-page">
+      <header className="auth-nav">
+        <a className="auth-nav-brand" href="/" aria-label="JunoGuard home">
+          <BrandMark className="auth-mark" size={25} />
+          <span>JUNOGUARD</span>
+        </a>
+        <nav aria-label="Explore JunoGuard">
+          <a href="/#product">Product</a>
+          <a href="/#how">How it works</a>
+          <a href="/#install">Install</a>
+          <a href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">
+            GitHub ↗
+          </a>
+        </nav>
+        <a className="auth-nav-home" href="/">Back home</a>
+      </header>
+
       <section className="auth-card">
         <a className="auth-brand" href="/" aria-label="JunoGuard home">
           <BrandMark className="auth-mark" size={25} />
@@ -85,6 +101,10 @@ export function SignIn() {
         {error && <p className="auth-error" role="alert">{error}</p>}
 
         <p className="auth-footnote">Protected by Supabase Auth. JunoGuard never receives your provider password.</p>
+        <nav className="auth-card-links" aria-label="More JunoGuard links">
+          <a href="/#product">Explore the product</a>
+          <a href="/#install">View setup guide</a>
+        </nav>
       </section>
     </main>
   );
