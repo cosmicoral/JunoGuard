@@ -42,6 +42,18 @@ OSSPREY_API_KEY = os.getenv("OSSPREY_API_KEY", "")
 OSSPREY_BASE_URL = os.getenv("OSSPREY_BASE_URL", "https://api.ossprey.com").rstrip("/")
 USE_OSSPREY = bool(OSSPREY_API_KEY)
 
+# Ossprey's scan is asynchronous; the gate it feeds is not. This is how long an
+# install may wait for a verdict before it is refused as unscanned.
+#
+# Measured against the live API, one component per scan: left-pad 7s,
+# @ossprey/test-package 6s, express 7-35s, react 37-60s across repeats. The
+# spread is the scanner's, not ours, and react sits close enough to a minute
+# that a 60s budget refuses it on a bad run. Hence 90: high enough that a
+# popular package is not intermittently unscannable, and only the first request
+# for a given version pays it at all — verdicts are cached against a resolved
+# version for CACHE_TTL_SECONDS.
+OSSPREY_SCAN_BUDGET_SECONDS = _int("OSSPREY_SCAN_BUDGET_SECONDS", 90)
+
 # --- package registries -----------------------------------------------------
 # Used only to resolve what `latest` currently means, so a verdict is cached
 # against an immutable version rather than a moving tag.

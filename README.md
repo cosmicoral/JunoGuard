@@ -225,6 +225,7 @@ what is still an intention.
 | Burst / rate limiting | **live** | `store.reserve`, SQL `reserve_action` |
 | Kill switch with operator roles and audit | **live** | `auth.py`, `control_events` |
 | Live dashboard, install evidence, signed-in product navigation, Supabase Realtime and SSE | **live** | `frontend/`, `POST /v1/events/token` |
+| Ossprey verdicts with an API key | **live** | `backend/app/ossprey.py` — OSSBOM submit, poll to a verdict, block before the install lands. The first scan of a version takes seconds to about a minute and is then cached; one that outruns the budget is refused as unscanned, never allowed |
 | Ossprey verdicts without an API key | **mock** | `ossprey._mock_verdict` — deterministic fixtures |
 | Model provider calls without a key | **mock** | `provider.MOCK_ANSWER` |
 | Agent-scoped blast radius | **live (client-declared)** | Clients report names-only local scope; `backend/app/blast.py` enriches it with scanner and sandbox evidence |

@@ -114,6 +114,12 @@ gateway container has no Docker daemon, and Modal is the detonation path.
 `BURST_LIMIT_PER_MINUTE`, `BLOCK_SEVERITY` (defaults to `unknown`),
 `SUSPEND_ON_MALWARE`, `PROVIDER_API_KEY` with `MOCK_PROVIDER=false`.
 
+`OSSPREY_SCAN_BUDGET_SECONDS` (defaults to 90) is how long an install may wait
+for a verdict. Ossprey's scan is asynchronous and the gate is not, so the hot
+path polls; measured cold scans run from 7s to about a minute depending on the
+package, and only the first request for a given version pays it. Set it too low
+and popular packages start failing closed as unscanned.
+
 **Never** put `SUPABASE_SERVICE_ROLE_KEY`, `OPERATOR_TOKEN` or
 `STREAM_TOKEN_SECRET` in a `VITE_`-prefixed variable. Every `VITE_` value is
 compiled into the public browser bundle.

@@ -51,6 +51,20 @@ CACHE_TTL_SECONDS = 300
 RESOLVE_TTL_SECONDS = 60
 MAX_CACHE_ENTRIES = 512
 
+# --- scan budget -------------------------------------------------------------
+#
+# The scan is asynchronous and the gate is not, so the hot path waits. These
+# bound that wait. An install that exceeds the budget is refused as unscanned,
+# never allowed on the assumption it was probably fine.
+#
+# A budget under the scanner's real spread does not make the gateway faster, it
+# makes it refuse popular packages. See config.OSSPREY_SCAN_BUDGET_SECONDS for
+# the measurements behind the default.
+
+SCAN_BUDGET_SECONDS = config.OSSPREY_SCAN_BUDGET_SECONDS
+POLL_INTERVAL_SECONDS = 1.0
+REQUEST_TIMEOUT_SECONDS = 10.0
+
 # Part of every cache key. Bump it when normalisation or thresholds change, so
 # verdicts decided under the old rules are not reused under the new ones.
 SCANNER_POLICY_VERSION = "1"
@@ -135,38 +149,128 @@ def _mock_verdict(package: str) -> dict[str, Any]:
     return {"source": "mock", "severity": "clean", "available": True, "findings": []}
 
 
-def _parse(payload: dict[str, Any]) -> dict[str, Any]:
-    """Normalise Ossprey's response into our envelope.
+def purl(package: str, ecosystem: str, version: str | None) -> str:
+    """Package URL, the coordinate Ossprey's SBOM speaks in.
 
-    Ossprey's shape has moved during the beta, so read defensively and treat
-    anything unrecognised as `unknown` rather than assuming clean.
+    An npm scope's `@` is percent-encoded — `pkg:npm/%40scope/name@1.0.0` — and
+    the `@` before the version is not. Getting that backwards produces a purl
+    the scanner accepts and silently scans nothing useful.
     """
-    severity = (
-        payload.get("severity")
-        or payload.get("verdict")
-        or ("malicious" if payload.get("malware") else None)
-        or "unknown"
-    )
-    severity = str(severity).lower()
-    if severity in {"malware", "malicious", "critical", "high"}:
-        severity = "malicious"
-    elif severity in {"suspicious", "medium", "warn"}:
-        severity = "suspicious"
-    elif severity in {"clean", "ok", "safe", "none", "low"}:
-        severity = "clean"
-    else:
-        severity = "unknown"
+    kind = "npm" if ecosystem == "npm" else "pypi"
+    name = package.strip()
+    coordinate = f"%40{name[1:]}" if name.startswith("@") else name
+    return f"pkg:{kind}/{coordinate}" + (f"@{version}" if version else "")
 
-    findings = payload.get("findings") or payload.get("reasons") or []
-    if isinstance(findings, str):
-        findings = [findings]
+
+def _parse(output: dict[str, Any]) -> dict[str, Any]:
+    """Normalise a finished Ossprey scan into our envelope.
+
+    The response carries no severity field. It carries a `vulnerabilities` list
+    whose entries have a `type`, and the absence of entries is the clean signal.
+    Read it defensively: an entry whose type we do not recognise is still an
+    entry, and grading it `clean` because the label was unfamiliar is exactly
+    the failure this function exists to avoid.
+    """
+    vulnerabilities = output.get("vulnerabilities") or []
+    extra = output.get("findings") or []
+
+    severity = "clean"
+    for vuln in vulnerabilities:
+        kind = str((vuln or {}).get("type") or "").lower()
+        if "malware" in kind or "malicious" in kind:
+            severity = "malicious"
+            break
+        # A vulnerability that is not malware is still something to answer for.
+        severity = "suspicious"
+
+    if severity == "clean" and extra:
+        severity = "suspicious"
+
+    findings: list[str] = []
+    for vuln in vulnerabilities:
+        vuln = vuln or {}
+        label = str(vuln.get("type") or "finding")
+        detail = str(vuln.get("description") or vuln.get("id") or "").strip()
+        findings.append(f"{label}: {detail}" if detail else label)
+    findings += [str(f) for f in extra]
 
     return {
         "source": "ossprey",
         "severity": severity,
         "available": True,
-        "findings": [str(f) for f in findings][:5],
+        "findings": findings[:5],
     }
+
+
+def _headers() -> dict[str, str]:
+    # `x-api-key`, not an Authorization bearer. The bearer form is accepted by
+    # the edge and then 404s on every path, which reads like a missing endpoint
+    # rather than a rejected credential.
+    return {"x-api-key": config.OSSPREY_API_KEY, "Content-Type": "application/json"}
+
+
+def _scan_and_wait(package: str, ecosystem: str, version: str | None) -> dict[str, Any]:
+    """Submit a scan and block until it finishes, or run out of patience.
+
+    Ossprey's scan is asynchronous — the POST only queues it — but the gate this
+    feeds is not: an agent is waiting on a decision and the whole claim is that
+    the decision happens before the install lands. So the wait happens here,
+    bounded, and a scan that outlives the budget raises rather than returning
+    something that would be read as a verdict. The caller turns that into
+    `unavailable`, which fails closed.
+
+    Observed round trip is a few seconds. The budget is deliberately several
+    times that, because being slow once is better than blocking a clean install.
+    """
+    submit = httpx.post(
+        f"{config.OSSPREY_BASE_URL}/public/v1/scans",
+        headers=_headers(),
+        json={
+            "sbom": {
+                "format": "OSSBOM",
+                "components": [
+                    {
+                        "purl": purl(package, ecosystem, version),
+                        "name": package,
+                        "version": version,
+                        "type": "npm" if ecosystem == "npm" else "pypi",
+                    }
+                ],
+            }
+        },
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    submit.raise_for_status()
+    queued = submit.json()
+    sbom_id, scan_id = queued.get("sbom_id"), queued.get("scan_id")
+    if not (sbom_id and scan_id):
+        raise RuntimeError(f"scan was not queued: {queued}")
+
+    deadline = time.time() + SCAN_BUDGET_SECONDS
+    while True:
+        poll = httpx.get(
+            f"{config.OSSPREY_BASE_URL}/public/v1/scans/status",
+            headers=_headers(),
+            params={"sbom_id": sbom_id, "scan_id": scan_id},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        poll.raise_for_status()
+        body = poll.json()
+        status = str(body.get("status") or "").upper()
+
+        if status == "SUCCEEDED":
+            return body.get("output") or {}
+        if status in {"QUEUED", "RUNNING"}:
+            if time.time() >= deadline:
+                raise TimeoutError(
+                    f"scan still {status} after {SCAN_BUDGET_SECONDS}s"
+                )
+            time.sleep(POLL_INTERVAL_SECONDS)
+            continue
+        # FAILED, or a status this code has never seen. Either way it is not a
+        # verdict, and guessing which way it would have gone is the one thing
+        # this module must never do.
+        raise RuntimeError(f"scan ended {status or 'with no status'}")
 
 
 def scan(package: str, ecosystem: str = "npm", version: str | None = None) -> dict[str, Any]:
@@ -186,14 +290,7 @@ def scan(package: str, ecosystem: str = "npm", version: str | None = None) -> di
             return {**cached, "source": "cache", "version": resolved}
 
     try:
-        r = httpx.post(
-            f"{config.OSSPREY_BASE_URL}/v1/scan",
-            headers={"Authorization": f"Bearer {config.OSSPREY_API_KEY}"},
-            json={"package": package, "ecosystem": ecosystem, "version": resolved},
-            timeout=10.0,
-        )
-        r.raise_for_status()
-        verdict = _parse(r.json())
+        verdict = _parse(_scan_and_wait(package, ecosystem, resolved))
     except Exception as exc:  # noqa: BLE001
         # An outage is not a verdict. Reporting it as `unknown` let the default
         # policy treat "we could not look" as "nothing much found" and hand back

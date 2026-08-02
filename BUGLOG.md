@@ -570,6 +570,57 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
 - Migration up is repeatable via `supabase/verify_migrations.sh` and leaves the
   expected schema/RLS state.
 
+### JG-020 — The Ossprey client was written against an API that does not exist
+
+**Priority:** P0 / Critical
+**Status:** FIXED
+
+> **Review comment:** Found while deploying the gateway, the first time a real
+> `OSSPREY_API_KEY` was ever present. Lane A's only source of truth had never
+> executed against the live service. It posted to `{base}/v1/scan` with an
+> `Authorization: Bearer` header and expected a synchronous `{severity,
+> findings}` body. The real API is `POST {base}/public/v1/scans`, authenticated
+> with `x-api-key`, taking an OSSBOM component list and returning `202 QUEUED`
+> — the verdict arrives by polling `GET /public/v1/scans/status`.
+>
+> Every path returned 404. Because JG-004 was fixed, the gateway failed closed
+> and refused every install rather than allowing anything, so the defect
+> presented as a total outage rather than a bypass. Configuring the scanner
+> made the product strictly less usable than leaving it on fixtures.
+
+**Why the suite did not catch it**
+
+- All 71 tests monkeypatched `app.risk.ossprey.scan` and asserted what policy
+  does with a verdict. Nothing exercised the transport, so the wire format was
+  free to be fiction and every test still agreed with it.
+
+**Reproduction**
+
+- Set a valid `OSSPREY_API_KEY`, `JUNO_ENV=production`.
+- `POST /v1/guard/install {"package":"react"}`.
+- Result: `decision=block`, `severity=unavailable`, error `404 Not Found for
+  url 'https://api.ossprey.com/v1/scan'`.
+
+**Mitigation**
+
+- Rewrite the client for the documented contract: OSSBOM submit, `x-api-key`,
+  poll to a terminal status, parse `output.vulnerabilities[].type`.
+- Absence of vulnerabilities is the clean signal; an unrecognised entry type is
+  graded `suspicious`, never `clean`.
+- A scan that exceeds `OSSPREY_SCAN_BUDGET_SECONDS` raises rather than
+  returning, so it becomes `unavailable` and keeps failing closed per JG-004.
+- Cover the transport in `tests/test_ossprey_client.py` using payloads recorded
+  from the live API, with nothing patching `scan` itself.
+
+**Verification**
+
+- Against the deployed gateway: `react` → `allow` / `clean` / `source: ossprey`;
+  `@ossprey/test-package` → `block` / `malicious` carrying Ossprey's own
+  "Malware" finding, which then auto-suspended the project.
+- Measured scan latency: left-pad 7s, canary 6s, express 7–35s, react 37–60s.
+  The default budget is 90s so a popular package is not intermittently
+  unscannable.
+
 ## Test and audit log
 
 ### Passed
