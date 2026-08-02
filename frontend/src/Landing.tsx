@@ -197,7 +197,7 @@ export function Landing() {
             <div>
               <p className="card-label">SUPPLY CHAIN</p>
               <h3>Stop the package before it reaches disk.</h3>
-              <p>Installs that go through the MCP tool or `juno` CLI/PATH wrap are scanned for known risk and refused with a structured reason the agent can understand.</p>
+              <p>Installs that go through the MCP tool, `juno` CLI/PATH wrap, or Cursor shell hook are scanned for known risk and refused with a structured reason the agent can understand.</p>
             </div>
             <ul>
               <li><span>01</span> Pre-install interception</li>

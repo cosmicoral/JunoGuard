@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
-import { main } from "../dist/cli.js";
+import { main, withIgnoredScripts } from "../dist/cli.js";
 
 const originalMock = process.env.JUNO_MOCK;
 const originalLog = console.log;
@@ -37,6 +37,25 @@ test("yarn lockfile install is refused without an override", async () => {
     version: "0.0.0-test",
   });
   assert.equal(code, 5);
+});
+
+test("npm and pnpm installs get --ignore-scripts by default", () => {
+  assert.deepEqual(withIgnoredScripts(["npm", "install", "lodash"], "npm"), [
+    "npm",
+    "install",
+    "--ignore-scripts",
+    "lodash",
+  ]);
+  assert.deepEqual(withIgnoredScripts(["pnpm", "add", "react"], "pnpm"), [
+    "pnpm",
+    "add",
+    "--ignore-scripts",
+    "react",
+  ]);
+  assert.deepEqual(
+    withIgnoredScripts(["npm", "install", "--no-ignore-scripts", "lodash"], "npm"),
+    ["npm", "install", "--no-ignore-scripts", "lodash"],
+  );
 });
 
 test("help lists pnpm and yarn forwarders", async () => {

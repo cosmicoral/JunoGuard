@@ -155,8 +155,13 @@ juno pnpm add react zod        # scan, then run the real pnpm
 juno yarn add react zod        # scan, then run the real yarn
 juno pip install requests      # scan, then run the real pip
 juno wrap on                   # PATH shims so bare installs hit the gate
+juno init cursor               # MCP config + Cursor shell install hook
 juno watch                     # tail the live decision feed
 ```
+
+`juno npm|pnpm install` adds `--ignore-scripts` by default so an allowed
+package still cannot run host lifecycle scripts unless you pass
+`--no-ignore-scripts` deliberately.
 
 The forwarder is the one that matters. It scans every named package and only
 shells out to the real package manager if all of them come back clean:

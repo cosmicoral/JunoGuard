@@ -130,8 +130,9 @@ Every package the agent tries to install is intercepted **before** it reaches di
   calling the tool. `juno npm|pnpm|yarn|pip …` closes the gap for installs that
   go through the CLI. `juno wrap on` adds project-local PATH shims so bare
   package-manager invocations hit the same gate; absolute paths to the real
-  binary still bypass. A kernel or package-manager hook that an agent genuinely
-  cannot step around is not implemented.
+  binary still bypass. `juno init` also writes a Cursor `beforeShellExecution`
+  hook that denies ungated installs inside the agent shell. A kernel boundary
+  that every agent genuinely cannot step around is not implemented.
 - [Ossprey](https://ossprey.com) malware verdict
 - Registry-backed CycloneDX 1.6 SBOM for the exact package coordinate
 - Optional Docker detonation of non-clean npm lifecycle scripts and PyPI
@@ -220,7 +221,9 @@ what is still an intention.
 | Registry-backed CycloneDX SBOM generation | **live** | `backend/app/sbom.py`; runs for mock and Ossprey verdicts, fail-closed on clean installs when the registry cannot identify the package |
 | Sandbox detonation of non-clean npm and PyPI packages | **live (opt-in)** | `backend/app/sandbox.py`, hardened images in `sandbox/` |
 | PATH wrap for bare package-manager installs | **live (opt-in)** | `juno wrap on` → `.junoguard/bin` shims; absolute paths still bypass |
-| Kernel / package-manager hook an agent cannot bypass | **planned** | MCP remains advisory without an OS boundary |
+| Cursor shell install gate | **live (opt-in via init)** | `beforeShellExecution` deny for ungated npm/pnpm/yarn/pip installs; `failClosed: true` |
+| Guarded JS installs default to `--ignore-scripts` | **live** | `juno npm|pnpm …` adds `--ignore-scripts` unless overridden |
+| Kernel / package-manager hook an agent cannot bypass | **planned** | Non-Cursor agents and absolute host escapes remain outside the shell hook |
 
 `GET /health` reports `mode: mock` whenever the Ossprey or provider credentials
 are absent, so the running system says which of these it is.

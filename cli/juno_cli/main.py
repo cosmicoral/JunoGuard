@@ -258,10 +258,22 @@ def _forward(ctx: typer.Context, ecosystem: str, argv: list[str], manager: str) 
     _exec([*argv, *tokens], manager)
 
 
+def _with_ignored_scripts(cmd: list[str], manager: str) -> list[str]:
+    """Lifecycle scripts run with host credentials — keep them off by default."""
+    if manager not in {"npm", "pnpm"}:
+        return cmd
+    if "--ignore-scripts" in cmd or "--no-ignore-scripts" in cmd:
+        return cmd
+    if len(cmd) < 2:
+        return [*cmd, "--ignore-scripts"]
+    return [cmd[0], cmd[1], "--ignore-scripts", *cmd[2:]]
+
+
 def _exec(cmd: list[str], manager: str) -> None:
-    console.print(f"$ {' '.join(cmd)}", style=S_DIM)
+    gated = _with_ignored_scripts(cmd, manager)
+    console.print(f"$ {' '.join(gated)}", style=S_DIM)
     try:
-        result = subprocess.run(cmd)
+        result = subprocess.run(gated)
     except FileNotFoundError:
         console.print(f"{manager} is not on PATH", style=S_BLOCK)
         raise typer.Exit(EXIT_UNAVAILABLE)

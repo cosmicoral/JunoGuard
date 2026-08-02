@@ -13,6 +13,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import pc from "picocolors";
 
 import {
@@ -25,6 +26,10 @@ import {
 } from "./agents.js";
 import { DEFAULT_API_URL, JunoClient, JunoNotConfigured, JunoUnavailable } from "./client.js";
 import { SCRIPT, clockNow, diffStatus, renderEvent, type Event } from "./feed.js";
+import {
+  hookShellResponse,
+  writeCursorHooks,
+} from "./hooks.js";
 import {
   renderError,
   renderInstall,
@@ -300,9 +305,20 @@ async function cmdForward(
   return exec([...argv0, ...rest], manager);
 }
 
+/** Lifecycle scripts run with full host credentials — keep them off by default. */
+export function withIgnoredScripts(cmd: string[], manager: string): string[] {
+  if (manager === "pip" || manager === "yarn") return cmd;
+  if (manager !== "npm" && manager !== "pnpm") return cmd;
+  if (cmd.includes("--ignore-scripts") || cmd.includes("--no-ignore-scripts")) return cmd;
+  // Insert after the verb (`install` / `add`) so npm/pnpm still see it as a flag.
+  if (cmd.length < 2) return [...cmd, "--ignore-scripts"];
+  return [cmd[0]!, cmd[1]!, "--ignore-scripts", ...cmd.slice(2)];
+}
+
 function exec(cmd: string[], manager: string): Promise<number> {
-  const real = resolveRealBinary(cmd[0] ?? manager);
-  const argv = [real, ...cmd.slice(1)];
+  const gated = withIgnoredScripts(cmd, manager);
+  const real = resolveRealBinary(gated[0] ?? manager);
+  const argv = [real, ...gated.slice(1)];
   say(`$ ${argv.join(" ")}`, "dim");
   return new Promise((resolve) => {
     const child = spawn(argv[0]!, argv.slice(1), { stdio: "inherit", shell: false });
@@ -459,6 +475,10 @@ function cmdInit(argv: string[], packageName: string): number {
   console.log();
 
   let failures = 0;
+  const hookCommand = flags.bools.local
+    ? `${process.execPath} ${new URL("./bin.js", import.meta.url).pathname} hook shell`
+    : `npx -y ${packageName} hook shell`;
+
   for (const agent of requested) {
     const result = writeConfig(agent, scope, cwd, "junoguard", entry, {
       force,
@@ -487,6 +507,33 @@ function cmdInit(argv: string[], packageName: string): number {
             .join("\n"),
         );
         break;
+    }
+
+    if (agent.id === "cursor") {
+      const hooks = writeCursorHooks(scope, cwd, hookCommand, { force, dryRun });
+      switch (hooks.kind) {
+        case "written":
+          say(
+            `  ✓ ${"Cursor hooks".padEnd(13)}${hooks.path}${hooks.created ? "  (created)" : ""}`,
+            "allow",
+          );
+          break;
+        case "exists":
+          say(`  · ${"Cursor hooks".padEnd(13)}already configured — use --force to replace`, "dim");
+          break;
+        case "unparseable":
+          failures += 1;
+          say(`  ✗ ${"Cursor hooks".padEnd(13)}${hooks.path} is not valid JSON`, "block");
+          if (hooks.snippet) {
+            console.log(
+              hooks.snippet
+                .split("\n")
+                .map((line) => `    ${pc.dim(line)}`)
+                .join("\n"),
+            );
+          }
+          break;
+      }
     }
   }
 
@@ -552,6 +599,7 @@ ${pc.bold("COMMANDS")}
   yarn add <pkg>...         scan, then run the real yarn if all are clean
   pip install <pkg>...      scan, then run the real pip if all are clean
   wrap on|off|status        project PATH shims so bare installs hit the gate
+  hook shell                Cursor beforeShellExecution gate (stdin JSON)
   watch                     tail the live decision feed
   init [agent]...           wire junoguard into an AI coding agent
   mcp                       run the MCP server over stdio
@@ -633,6 +681,17 @@ export async function main(
 
     case "wrap":
       return cmdWrap(rest);
+
+    case "hook": {
+      const [sub] = rest;
+      if (sub !== "shell") {
+        say("usage: juno hook shell   (reads Cursor hook stdin JSON)", "flag");
+        return 1;
+      }
+      const raw = readFileSync(0, "utf8");
+      process.stdout.write(hookShellResponse(raw));
+      return EXIT_OK;
+    }
 
     case "mcp": {
       // Imported lazily so the CLI path never pays for the MCP SDK.
