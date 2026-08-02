@@ -49,6 +49,7 @@ def evaluate_install(
     ecosystem: str,
     version: str | None,
     policy: dict[str, Any],
+    agent_scope: dict[str, Any] | None = None,
 ) -> Verdict:
     verdict = ossprey.scan(package, ecosystem, version)
     severity = verdict["severity"]
@@ -120,7 +121,6 @@ def evaluate_install(
             },
         )
 
-    radius = blast.compute(package, findings)
     sandbox_result: dict[str, Any] | None = None
     sandbox_error: str | None = None
     sandbox_supported = ecosystem in {"npm", "pypi"}
@@ -132,6 +132,13 @@ def evaluate_install(
         except sandbox.SandboxError as exc:
             sandbox_error = str(exc)
 
+    sandbox_observations = list((sandbox_result or {}).get("observations") or [])
+    radius = blast.compute(
+        package,
+        findings,
+        agent_scope=agent_scope,
+        sandbox_observations=[str(item) for item in sandbox_observations],
+    )
     metadata = {
         "verdict": verdict,
         "sbom": document,
@@ -143,7 +150,7 @@ def evaluate_install(
 
     scanner_blocks = ossprey.at_least(severity, policy["block_severity"])
     if config.SANDBOX_ENABLED and sandbox_supported and not scanner_blocks:
-        observations = list((sandbox_result or {}).get("observations") or [])
+        observations = sandbox_observations
         sandbox_status = (sandbox_result or {}).get("status")
         if sandbox_error or sandbox_status != "completed" or observations:
             detail = sandbox_error or "; ".join(str(item) for item in observations[:3])

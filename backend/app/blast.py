@@ -1,14 +1,17 @@
 """Blast radius.
 
 Blocking is table stakes. The question a security reviewer actually asks is
-"what would this have reached?" — so we answer it from the agent's real scope.
+"what would this have reached?" — so we answer it from the scope declared by
+the local agent client.
 
-No LLM, no guessing: we read what is actually in the environment.
+No LLM and no secret values cross the API: only credential names and workspace
+capability flags are accepted.
 """
 
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -63,7 +66,7 @@ def _is_credential(name: str) -> bool:
     return any(marker in upper for marker in CREDENTIAL_MARKERS)
 
 
-def _env_file_names() -> set[str]:
+def _env_file_names(scan_path: Path = SCAN_PATH) -> set[str]:
     """Variable names declared in the repo's .env files.
 
     Names only — the values are exactly what we are trying to protect, and
@@ -71,7 +74,7 @@ def _env_file_names() -> set[str]:
     """
     names: set[str] = set()
     for filename in ENV_FILES:
-        path = SCAN_PATH / filename
+        path = scan_path / filename
         if not path.is_file():
             continue
         try:
@@ -87,8 +90,7 @@ def _env_file_names() -> set[str]:
     return names
 
 
-def _credentials_in_scope() -> list[str]:
-    candidates = set(os.environ) | _env_file_names()
+def _credentials_in_scope(candidates: set[str]) -> list[str]:
     return sorted(name for name in candidates if _is_credential(name))
 
 
@@ -102,17 +104,51 @@ def _summarise(creds: list[str], clouds: list[str]) -> str:
     return "local source and filesystem access"
 
 
-def compute(package: str, findings: list[str] | None = None) -> dict[str, Any]:
-    """What the postinstall script would have had, had it run."""
-    reachable = set(os.environ) | _env_file_names()
-    creds = _credentials_in_scope()
+def _declared_scope(scope: dict[str, Any] | None) -> tuple[set[str], str, bool | None]:
+    if scope is None:
+        return set(os.environ) | _env_file_names(), "gateway_fallback", None
+
+    raw_names = scope.get("credential_names")
+    names = raw_names if isinstance(raw_names, list) else []
+    reachable = {
+        name
+        for name in names[:200]
+        if isinstance(name, str)
+        and len(name) <= 128
+        and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name)
+    }
+    access = str(scope.get("workspace_access") or "unknown")
+    repository = scope.get("repository")
+    write_access = access == "read_write"
+    return reachable, "client_declared", write_access if repository is True else None
+
+
+def compute(
+    package: str,
+    findings: list[str] | None = None,
+    agent_scope: dict[str, Any] | None = None,
+    sandbox_observations: list[str] | None = None,
+) -> dict[str, Any]:
+    """What the package would have reached in the declaring agent process."""
+    reachable, scope_source, workspace_writable = _declared_scope(agent_scope)
+    creds = _credentials_in_scope(reachable)
     clouds = sorted({label for var, label in CLOUD_MARKERS.items() if var in reachable})
 
     findings = findings or []
-    reads_env = any("environ" in f.lower() or "env" in f.lower() for f in findings)
+    observations = sandbox_observations or []
+    evidence = [*findings, *observations]
+    reads_env = any("environ" in item.lower() or "credential" in item.lower() for item in evidence)
     egress = any(
-        word in f.lower() for f in findings for word in ("outbound", "network", "post", "exfil")
+        word in item.lower()
+        for item in evidence
+        for word in ("outbound", "network", "post", "exfil")
     )
+    if workspace_writable is True:
+        write_access = "agent workspace (read/write)"
+    elif workspace_writable is False:
+        write_access = "agent workspace (read-only)"
+    else:
+        write_access = "workspace access not declared"
 
     return {
         # Cap the list: a wall of forty variable names reads as noise on a
@@ -120,8 +156,14 @@ def compute(package: str, findings: list[str] | None = None) -> dict[str, Any]:
         "credentials_in_scope": creds[:6],
         "credentials_total": len(creds),
         "cloud_access": clouds,
-        "network_egress": "unrestricted" if egress or not findings else "observed on install",
-        "write_access": "open repository",
+        "network_egress": (
+            "unrestricted — attempt observed"
+            if egress
+            else "agent network access (no attempt observed)"
+        ),
+        "write_access": write_access,
         "reads_environment": reads_env,
+        "scope_source": scope_source,
+        "scope_is_attested": False,
         "summary": _summarise(creds, clouds),
     }

@@ -309,6 +309,48 @@ def test_static_pypi_block_remains_authoritative_after_clean_detonation(
     assert response.json()["decision"] == "block"
 
 
+def test_install_uses_client_declared_agent_scope(
+    client: TestClient,
+    agent_headers: dict[str, str],
+    memory_store: MemoryStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "USE_OSSPREY", False)
+    monkeypatch.setattr(config, "SANDBOX_ENABLED", False)
+    memory_store.policy["block_severity"] = "malicious"
+    monkeypatch.setattr(
+        "app.risk.ossprey.scan",
+        lambda *a, **k: {
+            "available": True,
+            "severity": "suspicious",
+            "findings": ["reads environment"],
+            "source": "test",
+            "version": "1.0.0",
+        },
+    )
+
+    response = client.post(
+        "/v1/guard/install",
+        headers=agent_headers,
+        json={
+            "package": "example",
+            "ecosystem": "npm",
+            "version": "1.0.0",
+            "agent_scope": {
+                "credential_names": ["MY_TEST_SECRET"],
+                "workspace_access": "read_write",
+                "repository": True,
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "flag"
+    radius = response.json()["blast_radius"]
+    assert radius["credentials_in_scope"] == ["MY_TEST_SECRET"]
+    assert radius["scope_source"] == "client_declared"
+
+
 # --- Charged flags count toward spend (JG-003) ------------------------------
 
 

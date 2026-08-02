@@ -112,10 +112,19 @@ def controlled_project(
 # --- schemas ----------------------------------------------------------------
 
 
+class AgentScope(BaseModel):
+    """Names and capabilities declared by the calling agent; never secret values."""
+
+    credential_names: list[str] = Field(default_factory=list, max_length=200)
+    workspace_access: Literal["read_only", "read_write", "unknown"] = "unknown"
+    repository: bool | None = None
+
+
 class InstallRequest(BaseModel):
     package: str = Field(min_length=1, max_length=214)
     ecosystem: Literal["npm", "pypi"] = "npm"
     version: str | None = None
+    agent_scope: AgentScope | None = None
 
 
 class UnscannedRequest(BaseModel):
@@ -319,6 +328,7 @@ def guard_install(
             payload.ecosystem,
             payload.version,
             store.get_policy(project["id"]),
+            agent_scope=payload.agent_scope.model_dump() if payload.agent_scope else None,
         )
 
     action_id = _persist(
