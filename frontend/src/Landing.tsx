@@ -7,6 +7,22 @@ import { AGENT_MARKS, STACK_MARKS } from "./components/SystemMarks";
 const PACKAGE = "@heysalad/junoguard";
 const NPM_URL = "https://www.npmjs.com/package/@heysalad/junoguard";
 
+/**
+ * Stripe Payment Link. Unset renders the free-install CTA instead of a dead
+ * checkout button — a price with no way to pay is worse than no price.
+ */
+const CHECKOUT_URL = import.meta.env.VITE_CHECKOUT_URL as string | undefined;
+
+/** Only claims that are true today. The gateway line is deliberately honest. */
+const PRICING_INCLUDED = [
+  "Unlimited projects and agents",
+  "Both lanes — supply chain and token spend",
+  "Blast radius on every block",
+  "Kill switch with an accountable operator",
+  "Google and GitHub sign-in",
+  "Every future update, at no extra cost",
+];
+
 const installSteps = [
   {
     label: "01 / TRY IT",
@@ -111,6 +127,7 @@ export function Landing() {
           <a href="#how">How it works</a>
           <a href="#architecture">Architecture</a>
           <a href="#install">Install</a>
+          <a href="#pricing">Pricing</a>
           <a href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">GitHub</a>
         </nav>
         <a className="nav-console" href={consoleHref}>{consoleLabel} <span>↗</span></a>
@@ -282,8 +299,51 @@ export function Landing() {
         </div>
       </section>
 
+      <section className="pricing-section" id="pricing">
+        <div className="pricing-head">
+          <p className="section-index">PRICING / 05</p>
+          <h2>One pound.<br />Once. Forever.</h2>
+          <p className="pricing-lede">
+            A launch price for the developers who show up early. Pay once, keep
+            it — no renewal, no seat count, no upgrade path we quietly move you
+            onto later.
+          </p>
+        </div>
+
+        <div className="pricing-card">
+          <div className="pricing-price">
+            <span className="pricing-amount">£1</span>
+            <span className="pricing-term">
+              one-time
+              <em>lifetime access</em>
+            </span>
+          </div>
+
+          <ul className="pricing-list">
+            {PRICING_INCLUDED.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+
+          {CHECKOUT_URL ? (
+            <a className="primary-action pricing-cta" href={CHECKOUT_URL}>
+              Get lifetime access <span>→</span>
+            </a>
+          ) : (
+            <a className="secondary-action pricing-cta" href={NPM_URL} target="_blank" rel="noreferrer">
+              Install free while checkout opens <span>→</span>
+            </a>
+          )}
+
+          <p className="pricing-foot">
+            The CLI and MCP server are open source and free forever. The pound
+            buys the hosted gateway and console.
+          </p>
+        </div>
+      </section>
+
       <section className="final-cta">
-        <p className="section-index">READY / 05</p>
+        <p className="section-index">READY / 06</p>
         <h2>Give your agent<br />a gate before the blast radius.</h2>
         <div>
           <a className="primary-action" href={consoleHref}>{consoleLabel} <span>→</span></a>

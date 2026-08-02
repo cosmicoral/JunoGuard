@@ -4,7 +4,8 @@ import { useAuth } from "./auth/AuthContext";
 import { ActivityChart } from "./components/ActivityChart";
 import { Stats } from "./components/Stats";
 import { Feed } from "./components/Feed";
-import { PRODUCT_LINKS, Sidebar, type DashboardSection } from "./components/Sidebar";
+import { Sidebar, type DashboardSection } from "./components/Sidebar";
+import { JunoVoice } from "./components/JunoVoice";
 import { mode } from "./lib/supabase";
 import { useJuno } from "./lib/useJuno";
 
@@ -124,15 +125,6 @@ export function Dashboard() {
         />
 
         <main className="dashboard-main" data-suspended={juno.suspended}>
-          <nav className="dashboard-guide-links" aria-label="Product guide">
-            <strong>Product guide</strong>
-            {PRODUCT_LINKS.map((link) => (
-              <a href={link.href} key={link.href}>
-                {link.label}
-              </a>
-            ))}
-          </nav>
-
           <section ref={overviewRef} id="overview" className="dashboard-topbar">
             <div>
               <p className="section-kicker">JunoGuard</p>
@@ -263,23 +255,17 @@ export function Dashboard() {
             </section>
 
             <section ref={controlsRef} id="controls" className="panel support-card controls-card">
+              {/* Project state and kill-switch availability were repeated here
+                  from the topbar and the sidebar. Three copies of "Active" is
+                  not reassurance, it is noise. What only this card can show is
+                  who last changed the state and why. */}
               <div className="support-card-head">
                 <div>
                   <p className="section-kicker">Policy</p>
-                  <h2>Enforcement</h2>
+                  <h2>Control history</h2>
                 </div>
                 <span className="control-role">{juno.role ?? "local"}</span>
               </div>
-              <dl className="control-grid">
-                <div>
-                  <dt>Project state</dt>
-                  <dd>{juno.suspended ? "Suspended" : "Active"}</dd>
-                </div>
-                <div>
-                  <dt>Kill switch</dt>
-                  <dd>{juno.canControl ? "Operator can suspend" : "Read-only session"}</dd>
-                </div>
-              </dl>
               {juno.lastControl ? (
                 <p className="control-history">
                   Last change: <strong>{juno.lastControl.action}</strong> by{" "}
@@ -296,6 +282,8 @@ export function Dashboard() {
           </div>
         </main>
       </div>
+
+      <JunoVoice />
     </div>
   );
 }
