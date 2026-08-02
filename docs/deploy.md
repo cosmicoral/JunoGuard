@@ -70,6 +70,33 @@ docker build -t junoguard-gateway ./backend
 docker run -p 8000:8000 --env-file ./backend/.env.production junoguard-gateway
 ```
 
+### On Modal
+
+`backend/modal_app.py` serves the same `app.main:app` on Modal, which is where
+the detonation worker already runs. Configuration comes from a Modal secret, so
+no credential is ever in the image or the repository:
+
+```bash
+modal secret create junoguard-gateway \
+  JUNO_ENV=production SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… \
+  ALLOWED_ORIGINS=https://junoguard.com,https://www.junoguard.com \
+  STREAM_TOKEN_SECRET=… OPERATOR_TOKEN=… OSSPREY_API_KEY=… \
+  PUBLIC_BASE_URL=https://<workspace>--junoguard-gateway.modal.run \
+  MODAL_DETONATE_URL=… MODAL_DETONATE_TOKEN=… DETONATION_CALLBACK_TOKEN=…
+
+modal deploy backend/modal_app.py
+```
+
+The `label=` on the web endpoint fixes the URL to
+`https://<workspace>--junoguard-gateway.modal.run`, so `PUBLIC_BASE_URL` can be
+set in the secret before the first deploy rather than after it.
+
+`max_containers=1` enforces the replica constraint below rather than leaving it
+to a runbook. Modal has no platform health check to point at `/ready`, so §4 is
+the only thing that will tell you the deployment is fit to supervise anything —
+run it after every deploy. Note that `SANDBOX_ENABLED` cannot work here: the
+gateway container has no Docker daemon, and Modal is the detonation path.
+
 ### Required in production
 
 | Variable | Why |
