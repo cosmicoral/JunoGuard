@@ -34,6 +34,22 @@ def memory_store(monkeypatch: pytest.MonkeyPatch) -> MemoryStore:
     monkeypatch.setattr(config, "USE_SUPABASE", False)
     monkeypatch.setattr(config, "USE_OSSPREY", False)
     monkeypatch.setattr(config, "MOCK_PROVIDER", True)
+    # Keep install tests offline: SBOM now runs for mock and live scanners,
+    # and the suite stubs registry identity unless a test overrides it.
+    monkeypatch.setattr(
+        "app.risk.sbom.generate",
+        lambda package, ecosystem, version=None: {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "metadata": {
+                "component": {
+                    "name": package,
+                    "version": version or "0.0.0",
+                    "purl": f"pkg:{ecosystem}/{package}@{version or '0.0.0'}",
+                }
+            },
+        },
+    )
     # Drop any SSE / scanner cache left by a previous test.
     events._events.clear()
     events._seq = 0

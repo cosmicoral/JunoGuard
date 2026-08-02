@@ -78,13 +78,15 @@ def evaluate_install(
             },
         )
 
+    # SBOM identity comes from the package registry, not from Ossprey. Generate
+    # it for every available verdict — including the deterministic mock scanner —
+    # so the audit trail still names the exact coordinate that was gated.
     document: dict[str, Any] | None = None
     sbom_error: str | None = None
-    if config.USE_OSSPREY:
-        try:
-            document = sbom.generate(package, ecosystem, verdict.get("version") or version)
-        except sbom.SbomError as exc:
-            sbom_error = str(exc)
+    try:
+        document = sbom.generate(package, ecosystem, verdict.get("version") or version)
+    except sbom.SbomError as exc:
+        sbom_error = str(exc)
 
     # A clean verdict for one named package does not cover a component whose
     # identity could not be established independently from registry metadata.
@@ -93,7 +95,7 @@ def evaluate_install(
         return Verdict(
             decision="block",
             reason=(
-                f"{package} was NOT installed. Ossprey found no malware, but "
+                f"{package} was NOT installed. The scanner found no malware, but "
                 f"JunoGuard could not generate the package SBOM: {sbom_error}. "
                 f"Retry when the registry is reachable."
             ),

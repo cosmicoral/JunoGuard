@@ -214,7 +214,7 @@ what is still an intention.
 | Ossprey verdicts without an API key | **mock** | `ossprey._mock_verdict` — deterministic fixtures |
 | Model provider calls without a key | **mock** | `provider.MOCK_ANSWER` |
 | Agent-scoped blast radius | **live (client-declared)** | Clients report names-only local scope; `backend/app/blast.py` enriches it with scanner and sandbox evidence |
-| Registry-backed CycloneDX SBOM generation | **live** | `backend/app/sbom.py`; returned and audited with install decisions |
+| Registry-backed CycloneDX SBOM generation | **live** | `backend/app/sbom.py`; runs for mock and Ossprey verdicts, fail-closed on clean installs when the registry cannot identify the package |
 | Sandbox detonation of non-clean npm and PyPI packages | **live (opt-in)** | `backend/app/sandbox.py`, hardened images in `sandbox/` |
 | Interception an agent cannot bypass | **planned** | MCP is advisory (see Lane A); no OS or package-manager boundary |
 

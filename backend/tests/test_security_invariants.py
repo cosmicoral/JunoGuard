@@ -27,11 +27,12 @@ def _install(
     headers: dict[str, str],
     package: str = "left-pad",
     ecosystem: str = "npm",
+    version: str = "1.0.0",
 ) -> Any:
     return client.post(
         "/v1/guard/install",
         headers=headers,
-        json={"package": package, "ecosystem": ecosystem, "version": "1.0.0"},
+        json={"package": package, "ecosystem": ecosystem, "version": version},
     )
 
 
@@ -97,6 +98,33 @@ def test_live_clean_install_returns_generated_sbom(
     assert response.json()["decision"] == "allow"
     assert response.json()["sbom"] == document
     generator.assert_called_once_with("left-pad", "npm", "1.0.0")
+
+
+def test_mock_scanner_still_generates_registry_sbom(
+    client: TestClient, agent_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(config, "USE_OSSPREY", False)
+    document = {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.6",
+        "metadata": {
+            "component": {
+                "name": "left-pad",
+                "version": "1.3.0",
+                "purl": "pkg:npm/left-pad@1.3.0",
+            }
+        },
+    }
+    generator = MagicMock(return_value=document)
+    monkeypatch.setattr("app.risk.sbom.generate", generator)
+
+    response = _install(client, agent_headers, package="left-pad", version="1.3.0")
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "allow"
+    assert response.json()["sbom"] == document
+    assert client.get("/health").json()["sbom"] == "registry"
+    generator.assert_called_once_with("left-pad", "npm", "1.3.0")
 
 
 def test_live_clean_install_blocks_when_sbom_generation_fails(

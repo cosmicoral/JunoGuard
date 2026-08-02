@@ -113,10 +113,12 @@ client-declared evidence; it is not cryptographically attested.
 
 `blast_radius` is null when the decision is `allow`.
 
-In live Ossprey mode, JunoGuard independently resolves the exact package
-coordinate from the npm registry or PyPI and generates a CycloneDX 1.6 SBOM.
-A clean malware verdict does not proceed if that registry identity cannot be
-documented. `sbom` is null in deterministic offline fixture mode.
+JunoGuard independently resolves the exact package coordinate from the npm
+registry or PyPI and generates a CycloneDX 1.6 SBOM for every available
+verdict — including the deterministic mock scanner. A clean malware verdict
+does not proceed if that registry identity cannot be documented. Offline CLI
+fixtures (`JUNO_MOCK=1`) never reach the gateway, so they do not produce an
+SBOM; a running gateway still attempts registry identity for mock verdicts.
 
 When `SANDBOX_ENABLED=true`, every non-clean npm or PyPI verdict is detonated
 before a proceedable flag is returned. The gateway downloads the registry
