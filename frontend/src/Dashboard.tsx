@@ -4,7 +4,7 @@ import { useAuth } from "./auth/AuthContext";
 import { ActivityChart } from "./components/ActivityChart";
 import { Stats } from "./components/Stats";
 import { Feed } from "./components/Feed";
-import { Sidebar, type DashboardSection } from "./components/Sidebar";
+import { PRODUCT_LINKS, Sidebar, type DashboardSection } from "./components/Sidebar";
 import { mode } from "./lib/supabase";
 import { useJuno } from "./lib/useJuno";
 
@@ -129,6 +129,13 @@ export function Dashboard() {
               <p className="section-kicker">JunoGuard</p>
               <h1>Overview</h1>
               <p>{juno.project.name}</p>
+              <nav className="dashboard-guide-links" aria-label="Product guide">
+                {PRODUCT_LINKS.map((link) => (
+                  <a href={link.href} key={link.href}>
+                    {link.label}
+                  </a>
+                ))}
+              </nav>
             </div>
             <div className="topbar-status" data-suspended={juno.suspended}>
               <span className="status" data-suspended={juno.suspended}>
