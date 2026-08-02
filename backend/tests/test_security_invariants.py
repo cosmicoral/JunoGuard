@@ -22,11 +22,16 @@ def _llm(client: TestClient, headers: dict[str, str], **extra: Any) -> Any:
     return client.post("/v1/guard/llm", headers=headers, json=body)
 
 
-def _install(client: TestClient, headers: dict[str, str], package: str = "left-pad") -> Any:
+def _install(
+    client: TestClient,
+    headers: dict[str, str],
+    package: str = "left-pad",
+    ecosystem: str = "npm",
+) -> Any:
     return client.post(
         "/v1/guard/install",
         headers=headers,
-        json={"package": package, "ecosystem": "npm", "version": "1.0.0"},
+        json={"package": package, "ecosystem": ecosystem, "version": "1.0.0"},
     )
 
 
@@ -196,6 +201,112 @@ def test_sandbox_clearance_preserves_policy_flag(
     assert response.status_code == 200
     assert response.json()["decision"] == "flag"
     assert response.json()["sandbox"]["status"] == "completed"
+
+
+def test_pypi_sandbox_evidence_promotes_flag_to_block(
+    client: TestClient,
+    agent_headers: dict[str, str],
+    memory_store: MemoryStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "USE_OSSPREY", True)
+    monkeypatch.setattr(config, "SANDBOX_ENABLED", True)
+    memory_store.policy["block_severity"] = "malicious"
+    monkeypatch.setattr(
+        "app.risk.ossprey.scan",
+        lambda *a, **k: {
+            "available": True,
+            "severity": "suspicious",
+            "findings": ["build backend present"],
+            "source": "ossprey",
+            "version": "1.0.0",
+        },
+    )
+    monkeypatch.setattr("app.risk.sbom.generate", lambda *a, **k: {"bomFormat": "CycloneDX"})
+    evidence = {
+        "status": "completed",
+        "scripts_executed": [{"lifecycle": "build", "exit_code": 0}],
+        "observations": ["Python package created 3 file(s)"],
+    }
+    detonator = MagicMock(return_value=evidence)
+    monkeypatch.setattr("app.risk.sandbox.detonate", detonator)
+
+    response = _install(client, agent_headers, "example-pkg", "pypi")
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "block"
+    assert response.json()["sandbox"] == evidence
+    detonator.assert_called_once_with("example-pkg", "pypi", "1.0.0")
+
+
+def test_unavailable_pypi_detonation_blocks_otherwise_proceedable_flag(
+    client: TestClient,
+    agent_headers: dict[str, str],
+    memory_store: MemoryStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.sandbox import SandboxError
+
+    monkeypatch.setattr(config, "USE_OSSPREY", True)
+    monkeypatch.setattr(config, "SANDBOX_ENABLED", True)
+    memory_store.policy["block_severity"] = "malicious"
+    monkeypatch.setattr(
+        "app.risk.ossprey.scan",
+        lambda *a, **k: {
+            "available": True,
+            "severity": "suspicious",
+            "findings": ["new package"],
+            "source": "ossprey",
+            "version": "1.0.0",
+        },
+    )
+    monkeypatch.setattr("app.risk.sbom.generate", lambda *a, **k: {"bomFormat": "CycloneDX"})
+    monkeypatch.setattr(
+        "app.risk.sandbox.detonate",
+        MagicMock(side_effect=SandboxError("worker image unavailable")),
+    )
+
+    response = _install(client, agent_headers, "example-pkg", "pypi")
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "block"
+    assert response.json()["sandbox"] is None
+    assert "worker image unavailable" in response.json()["reason"]
+
+
+def test_static_pypi_block_remains_authoritative_after_clean_detonation(
+    client: TestClient,
+    agent_headers: dict[str, str],
+    memory_store: MemoryStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "USE_OSSPREY", True)
+    monkeypatch.setattr(config, "SANDBOX_ENABLED", True)
+    memory_store.policy["block_severity"] = "suspicious"
+    monkeypatch.setattr(
+        "app.risk.ossprey.scan",
+        lambda *a, **k: {
+            "available": True,
+            "severity": "suspicious",
+            "findings": ["new package"],
+            "source": "ossprey",
+            "version": "1.0.0",
+        },
+    )
+    monkeypatch.setattr("app.risk.sbom.generate", lambda *a, **k: {"bomFormat": "CycloneDX"})
+    monkeypatch.setattr(
+        "app.risk.sandbox.detonate",
+        lambda *a, **k: {
+            "status": "completed",
+            "scripts_executed": [],
+            "observations": [],
+        },
+    )
+
+    response = _install(client, agent_headers, "example-pkg", "pypi")
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "block"
 
 
 # --- Charged flags count toward spend (JG-003) ------------------------------

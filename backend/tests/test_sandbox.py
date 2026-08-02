@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import runpy
 import subprocess
+import zipfile
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -12,6 +14,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from app import config, sandbox
+
+PYTHON_RUNNER = runpy.run_path(
+    str(Path(__file__).parents[2] / "sandbox" / "python_runner.py")
+)
 
 
 def npm_artifact(url: str, payload: bytes) -> sandbox.Artifact:
@@ -34,6 +40,19 @@ def prepared_npm_artifact(path: Path) -> sandbox.PreparedArtifact:
             b"fixture",
         ),
         path=path,
+    )
+
+
+def pypi_artifact(url: str, payload: bytes) -> sandbox.Artifact:
+    return sandbox.Artifact(
+        ecosystem="pypi",
+        version="1.2.3",
+        kind="pypi-wheel",
+        url=url,
+        digest_algorithm="sha256",
+        digest=hashlib.sha256(payload).digest(),
+        suffix=".whl",
+        filename="example-1.2.3-py3-none-any.whl",
     )
 
 
@@ -68,6 +87,29 @@ def test_download_rejects_tarball_off_registry(
 
     with pytest.raises(sandbox.SandboxError, match="leaves the configured registry origin"):
         sandbox._download("example", "npm", "1.2.3", tmp_path)
+
+
+def test_download_rejects_pypi_digest_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    descriptor = pypi_artifact(
+        "https://files.pythonhosted.org/example-1.2.3.whl", b"expected"
+    )
+    monkeypatch.setattr(sandbox, "_registry_metadata", lambda *a, **k: descriptor)
+    monkeypatch.setattr(sandbox, "_chunks", lambda url: iter([b"tampered"]))
+
+    with pytest.raises(sandbox.SandboxError, match="does not match"):
+        sandbox._download("example", "pypi", "1.2.3", tmp_path)
+
+
+def test_pypi_artifacts_stay_on_approved_hosts() -> None:
+    assert sandbox._allowed_artifact(
+        "https://files.pythonhosted.org/packages/example.tar.gz", "pypi"
+    )
+    assert not sandbox._allowed_artifact("https://attacker.invalid/example.whl", "pypi")
+    assert not sandbox._allowed_artifact(
+        "http://files.pythonhosted.org/example.whl", "pypi"
+    )
 
 
 def test_pypi_metadata_prefers_sdist(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -133,6 +175,26 @@ def test_docker_command_enforces_isolation(tmp_path: Path) -> None:
     assert "--pull=never" in command
     assert "--user=65534:65534" in command
     assert str(artifact) in joined
+
+
+def test_pypi_docker_command_uses_dedicated_image_and_literal_mount(
+    tmp_path: Path,
+) -> None:
+    artifact_path = tmp_path / "package.whl"
+    prepared = sandbox.PreparedArtifact(
+        descriptor=pypi_artifact(
+            "https://files.pythonhosted.org/example-1.2.3.whl", b"fixture"
+        ),
+        path=artifact_path,
+    )
+
+    command = sandbox._docker_command("junoguard-test", prepared)
+
+    assert command[-1] == config.SANDBOX_PYPI_IMAGE
+    assert (
+        f"--mount=type=bind,src={artifact_path},"
+        "dst=/input/example-1.2.3-py3-none-any.whl,readonly"
+    ) in command
 
 
 def test_run_parses_structured_container_evidence(
@@ -208,3 +270,16 @@ def tempfile_prefix() -> str:
     import tempfile
 
     return str(Path(tempfile.gettempdir()))
+
+
+def test_python_worker_rejects_zip_path_traversal(tmp_path: Path) -> None:
+    artifact = tmp_path / "malicious.zip"
+    destination = tmp_path / "output"
+    destination.mkdir()
+    with zipfile.ZipFile(artifact, "w") as archive:
+        archive.writestr("../escaped.py", "raise SystemExit")
+
+    with pytest.raises(PYTHON_RUNNER["ArtifactRejected"], match="outside"):
+        PYTHON_RUNNER["extract_zip"](artifact, destination)
+
+    assert not (tmp_path / "escaped.py").exists()

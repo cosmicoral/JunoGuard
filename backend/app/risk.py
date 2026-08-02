@@ -123,7 +123,8 @@ def evaluate_install(
     radius = blast.compute(package, findings)
     sandbox_result: dict[str, Any] | None = None
     sandbox_error: str | None = None
-    if config.SANDBOX_ENABLED and ecosystem == "npm":
+    sandbox_supported = ecosystem in {"npm", "pypi"}
+    if config.SANDBOX_ENABLED and sandbox_supported:
         try:
             sandbox_result = sandbox.detonate(
                 package, ecosystem, verdict.get("version") or version
@@ -141,7 +142,7 @@ def evaluate_install(
     }
 
     scanner_blocks = ossprey.at_least(severity, policy["block_severity"])
-    if config.SANDBOX_ENABLED and ecosystem == "npm" and not scanner_blocks:
+    if config.SANDBOX_ENABLED and sandbox_supported and not scanner_blocks:
         observations = list((sandbox_result or {}).get("observations") or [])
         sandbox_status = (sandbox_result or {}).get("status")
         if sandbox_error or sandbox_status != "completed" or observations:
@@ -152,7 +153,7 @@ def evaluate_install(
                 decision="block",
                 reason=(
                     f"{package} was NOT installed. Its static verdict was {severity}, "
-                    f"and isolated lifecycle detonation did not clear it ({detail}). "
+                    f"and isolated package detonation did not clear it ({detail}). "
                     f"Choose a different dependency or ask an operator to review the evidence."
                 ),
                 risk_level="high",
