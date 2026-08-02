@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from pathlib import Path
 
 import httpx
 
@@ -23,6 +24,67 @@ DEFAULT_PROJECT_KEY = "jg_demo_key_cursorhack2026"
 DEFAULT_TIMEOUT = 20.0
 
 _TRUTHY = {"1", "true", "yes", "on"}
+_ENV_FILES = (".env", ".env.local", ".env.development", ".env.production")
+_CREDENTIAL_MARKERS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL", "PRIVATE", "DSN")
+_IGNORE = (
+    "SSH_AUTH_SOCK",
+    "KEYBOARD",
+    "KEYMAP",
+    "MAX_REQUEST_TOKENS",
+    "MAX_TOKENS",
+    "MAX_OUTPUT_TOKENS",
+    "TOKENS_PER",
+    "TOKEN_LIMIT",
+    "PUBLIC_KEY",
+    "KEY_LENGTH",
+)
+_CLOUD_NAMES = {
+    "AWS_PROFILE",
+    "AWS_ACCESS_KEY_ID",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "AZURE_CLIENT_SECRET",
+    "KUBECONFIG",
+}
+_MAX_ENV_FILE_BYTES = 64 * 1024
+
+
+def _is_credential(name: str) -> bool:
+    upper = name.upper()
+    if not upper.replace("_", "").isalnum() or upper[0].isdigit():
+        return False
+    if any(ignored in upper for ignored in _IGNORE):
+        return False
+    return upper in _CLOUD_NAMES or any(marker in upper for marker in _CREDENTIAL_MARKERS)
+
+
+def collect_agent_scope(cwd: Path | None = None) -> dict:
+    """Collect credential names and workspace capabilities, never values."""
+    workspace = (cwd or Path.cwd()).resolve()
+    candidates = set(os.environ)
+    for filename in _ENV_FILES:
+        path = workspace / filename
+        try:
+            if path.stat().st_size > _MAX_ENV_FILE_BYTES:
+                continue
+            for raw_line in path.read_text(errors="ignore").splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                name = line.split("=", 1)[0].strip().removeprefix("export ").strip()
+                if name:
+                    candidates.add(name)
+        except OSError:
+            continue
+
+    if not os.access(workspace, os.R_OK):
+        access = "unknown"
+    else:
+        access = "read_write" if os.access(workspace, os.W_OK) else "read_only"
+    return {
+        "credential_names": sorted(name for name in candidates if _is_credential(name))[:200],
+        "workspace_access": access,
+        "repository": (workspace / ".git").exists(),
+    }
 
 
 class JunoUnavailable(Exception):
@@ -85,7 +147,12 @@ class JunoClient:
         return self._request(
             "POST",
             "/v1/guard/install",
-            {"package": package, "ecosystem": ecosystem, "version": version},
+            {
+                "package": package,
+                "ecosystem": ecosystem,
+                "version": version,
+                "agent_scope": collect_agent_scope(),
+            },
         )
 
     def guard_llm(self, prompt: str, model: str = "gpt-4o", max_output_tokens: int = 300) -> dict:
