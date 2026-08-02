@@ -9,6 +9,9 @@ export function normalizeBlast(raw: unknown): BlastRadius | undefined {
   const network_egress = String(r.network_egress ?? "");
   const write_access = String(r.write_access ?? "");
   const summary = String(r.summary ?? "");
+  const scope_source = typeof r.scope_source === "string" ? r.scope_source : undefined;
+  const scope_is_attested =
+    typeof r.scope_is_attested === "boolean" ? r.scope_is_attested : undefined;
 
   // An empty credential list is a real answer, not a missing payload — the
   // scanned environment simply had no keys. Egress and write access still
@@ -16,7 +19,14 @@ export function normalizeBlast(raw: unknown): BlastRadius | undefined {
   // here is how a blocked install renders with no explanation at all.
   if (!credentials.length && !network_egress && !write_access && !summary) return undefined;
 
-  return { credentials, network_egress, write_access, summary };
+  return {
+    credentials,
+    network_egress,
+    write_access,
+    summary,
+    scope_source,
+    scope_is_attested,
+  };
 }
 
 function normalizeMetadata(raw: unknown): ActionMetadata {

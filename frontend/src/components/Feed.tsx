@@ -109,6 +109,15 @@ function InstallEvidencePanel({ action }: { action: AgentAction }) {
             <div className="blast-val">{blast.network_egress}</div>
             <div className="blast-key">Write access</div>
             <div className="blast-val">{blast.write_access}</div>
+            {blast.scope_source && (
+              <>
+                <div className="blast-key">Scope evidence</div>
+                <div className="blast-val">
+                  {blast.scope_source.replaceAll("_", " ")}
+                  {blast.scope_is_attested === false ? " · not attested" : ""}
+                </div>
+              </>
+            )}
           </div>
           <div className="blast-summary">Estimated blast radius — {blast.summary}</div>
         </section>

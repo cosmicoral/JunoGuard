@@ -72,7 +72,10 @@ This package was not installed. Choose a different dependency.
 ```
 
 Blocking is table stakes. The blast radius — what would have happened — is
-computed from the agent's actual scope, with no LLM involved.
+computed from the local client's declared scope, with no LLM involved. The
+client sends credential names and workspace capability flags only; secret
+values and local filesystem paths never enter the request. Because MCP itself
+is advisory, this scope declaration is evidence rather than remote attestation.
 
 That last line matters more than it looks. It is written for the agent, not
 just for you: it says plainly that nothing was installed and that it should

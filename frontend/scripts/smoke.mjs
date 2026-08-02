@@ -28,6 +28,7 @@ const needles = [
   "SIMULATION",
   "CycloneDX SBOM",
   "Sandbox detonation",
+  "Scope evidence",
 ];
 
 const missing = needles.filter((needle) => !bundle.includes(needle));

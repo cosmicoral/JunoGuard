@@ -275,6 +275,7 @@ def health() -> dict[str, Any]:
         "scanner": "ossprey" if config.USE_OSSPREY else "mock",
         "sbom": "registry" if config.USE_OSSPREY else "disabled_in_mock_mode",
         "sandbox": "docker" if config.SANDBOX_ENABLED else "disabled",
+        "blast_radius": "client_declared",
         "provider": "mock" if config.MOCK_PROVIDER or not config.PROVIDER_API_KEY else "live",
     }
 

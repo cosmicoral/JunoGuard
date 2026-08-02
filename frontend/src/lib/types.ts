@@ -8,6 +8,8 @@ export interface BlastRadius {
   network_egress: string;
   write_access: string;
   summary: string;
+  scope_source?: string;
+  scope_is_attested?: boolean;
 }
 
 export interface CycloneDxSbom {

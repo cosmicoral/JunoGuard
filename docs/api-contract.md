@@ -45,9 +45,20 @@ Lane A. Called before a package reaches disk.
 {
   "package": "@ossprey/test-package",
   "ecosystem": "npm",          // npm | pypi
-  "version": null              // optional
+  "version": null,             // optional
+  "agent_scope": {
+    "credential_names": ["OPENAI_API_KEY", "AWS_PROFILE"],
+    "workspace_access": "read_write", // read_only | read_write | unknown
+    "repository": true
+  }
 }
 ```
+
+`agent_scope` is optional for compatibility with older clients. Current
+JunoGuard clients derive it locally from process environment names and known
+top-level `.env*` files. They send names and capability flags only — never
+credential values or a local path. The gateway validates and caps this
+client-declared evidence; it is not cryptographically attested.
 
 **Response** — decision envelope, plus:
 
@@ -90,8 +101,11 @@ Lane A. Called before a package reaches disk.
   },
   "blast_radius": {
     "credentials_in_scope": ["OPENAI_API_KEY", "SUPABASE_SERVICE_ROLE_KEY"],
-    "network_egress": "unrestricted",
-    "write_access": "open repository",
+    "network_egress": "unrestricted — attempt observed",
+    "write_access": "agent workspace (read/write)",
+    "reads_environment": true,
+    "scope_source": "client_declared",
+    "scope_is_attested": false,
     "summary": "full production credential compromise"
   }
 }

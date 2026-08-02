@@ -169,7 +169,10 @@ Postinstall script would have executed with access to:
 Estimated blast radius: full production credential compromise
 ```
 
-Computed from the agent's actual scope. No LLM required.
+Computed from the local client’s declared scope. JunoGuard clients send only
+credential names and workspace capability flags — never secret values or local
+paths. The declaration is useful evidence, not remote attestation. No LLM
+required.
 
 ### Oversight and response
 
@@ -210,7 +213,7 @@ what is still an intention.
 | Live dashboard, install evidence, Supabase Realtime and SSE | **live** | `frontend/`, `POST /v1/events/token` |
 | Ossprey verdicts without an API key | **mock** | `ossprey._mock_verdict` — deterministic fixtures |
 | Model provider calls without a key | **mock** | `provider.MOCK_ANSWER` |
-| Blast radius | **mock** | `backend/app/blast.py` — inferred from the local environment, not measured |
+| Agent-scoped blast radius | **live (client-declared)** | Clients report names-only local scope; `backend/app/blast.py` enriches it with scanner and sandbox evidence |
 | Registry-backed CycloneDX SBOM generation | **live** | `backend/app/sbom.py`; returned and audited with install decisions |
 | Sandbox detonation of non-clean npm and PyPI packages | **live (opt-in)** | `backend/app/sandbox.py`, hardened images in `sandbox/` |
 | Interception an agent cannot bypass | **planned** | MCP is advisory (see Lane A); no OS or package-manager boundary |
