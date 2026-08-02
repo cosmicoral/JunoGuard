@@ -111,8 +111,10 @@ Every hot-path decision is deterministic: package verdicts, token estimation, co
 Additional LLM calls on the hot path:  0
 ```
 
-There is no AI on the hot path and, today, none on the cold path either: deep
-out-of-band analysis of flagged packages is designed but not built. See
+There is no AI on the hot path or in sandbox analysis. When the optional npm
+sandbox is enabled, non-clean packages take a bounded, deterministic container
+detonation step before a proceedable flag is returned. The package code runs in
+the isolated worker image, never in the gateway process. See
 [What is actually implemented](#what-is-actually-implemented).
 
 ---

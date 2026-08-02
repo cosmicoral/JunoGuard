@@ -20,8 +20,8 @@ RUN pip install --require-hashes -r requirements.txt
 
 COPY app ./app
 
-# Never runs as root. A gateway that executes no untrusted code still should not
-# be the most privileged thing in the cluster.
+# Never runs as root. Untrusted package code is delegated to the separately
+# isolated sandbox container and never executes inside this FastAPI process.
 RUN useradd --system --uid 10001 juno && chown -R juno:juno /srv
 USER juno
 
