@@ -10,6 +10,24 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Debian/Ubuntu installs versioned Postgres binaries under
+# /usr/lib/postgresql/<major>/bin without adding that directory to PATH.
+# pg_config is on PATH and reports the matching bindir on both CI and local
+# package-manager installs, so resolve it before invoking initdb/pg_ctl.
+if ! command -v initdb >/dev/null 2>&1; then
+    if command -v pg_config >/dev/null 2>&1; then
+        export PATH="$(pg_config --bindir):$PATH"
+    fi
+fi
+
+for command in initdb pg_ctl createdb psql; do
+    if ! command -v "$command" >/dev/null 2>&1; then
+        echo "Postgres command not found after installation: $command" >&2
+        exit 127
+    fi
+done
+
 workdir="$(mktemp -d "${TMPDIR:-/tmp}/junoguard-migrate.XXXXXX")"
 cleanup() {
     if [[ -n "${PG_PID:-}" ]] && kill -0 "$PG_PID" 2>/dev/null; then
