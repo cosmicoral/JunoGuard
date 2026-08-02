@@ -4,18 +4,31 @@ Installs a suspect package in a disposable, network-blocked Modal sandbox and
 reports what it actually did.
 
 ```
-gateway decides + responds          (hot path, unchanged, ~0 ms)
+gateway decides + responds                    (hot path, unchanged, ~0 ms)
         |
         v  background task
-POST /detonate ──> Modal ──> Sandbox(block_network=True)
-                                | npm/pip install, lifecycle scripts ENABLED
-                                | canary credentials seeded in the environment
-                                v
-                          observations
-                                |
-                                v
+POST /detonate ──> Modal worker  (has network)
+                     | fetch the registry artifact, verify its published digest
+                     v
+                   Sandbox(block_network=True)   (has none)
+                     | write the verified bytes in, extract
+                     | run each DECLARED lifecycle hook directly
+                     | canary credentials seeded in the environment
+                     v
+                  observations
+                     |
+                     v
         POST /v1/detonations/<action_id>  ──> gateway  ──> incident evidence
 ```
+
+**Why the fetch happens outside the sandbox.** The first version ran
+`npm install <pkg>` inside the network-blocked container. npm could not reach
+the registry, the package was never downloaded, no package code ran — and the
+report said "attempted network egress" for *every* package, because that egress
+was npm's own. Fetching and digest-verifying outside, then executing hooks on
+the extracted tree inside, fixes both halves: something actually runs, and an
+egress attempt now means the package reached for the network, since nothing else
+in the container has any reason to.
 
 ## What this is and is not
 
@@ -36,7 +49,8 @@ It never gates an install, and it is entirely optional. Unset
 
 | Signal | How |
 |---|---|
-| Lifecycle scripts | Read from the installed package's own `package.json` — declared, not guessed |
+| Lifecycle scripts | Read from the package's own manifest, then executed one at a time — declared *and* observed |
+| Artifact integrity | The tarball is checked against the registry's published `integrity`/`shasum` before it enters the sandbox; a mismatch aborts the run |
 | Network egress | Sandbox runs with `block_network=True`; an attempt fails, and the failure is the signal |
 | Credential access | **Fake** credentials under realistic names are seeded in the environment, generated fresh per run; a package that prints or stages one gives itself away, and a match cannot be a coincidence |
 | Stray writes | Filesystem diff before/after, minus the paths an install legitimately touches |
@@ -96,6 +110,28 @@ Python with no Modal imports, so the report shaping is unit-tested in
 ```bash
 cd backend && ./.venv/bin/python -m pytest tests/test_detonation.py -q
 ```
+
+## Known limitation
+
+Hooks run on an **extracted** package, not an installed dependency tree. A script
+that `require()`s the package's own dependencies will crash early — esbuild's
+postinstall does exactly this in testing, and the report says so honestly
+(`ran postinstall`, exit 1). Scripts using only Node builtins, which is what
+exfiltration looks like, run to completion. Installing the full tree would mean
+giving the sandbox registry access, which is the thing that made the first
+version useless.
+
+## Verified
+
+Against the deployed worker:
+
+| Package | Result |
+|---|---|
+| `left-pad@1.3.0` | `severity: none` — no hooks, no egress, no stray writes (4.5s) |
+| `esbuild@0.21.5` | `severity: low` — `postinstall` observed running, no egress (3.4s) |
+
+`low` for esbuild is correct and deliberate: a postinstall on its own is
+ordinary, and native modules build that way.
 
 ## Cost
 

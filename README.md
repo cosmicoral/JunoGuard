@@ -230,7 +230,7 @@ what is still an intention.
 | Agent-scoped blast radius | **live (client-declared)** | Clients report names-only local scope; `backend/app/blast.py` enriches it with scanner and sandbox evidence |
 | Registry-backed CycloneDX SBOM generation | **live** | `backend/app/sbom.py`; runs for mock and Ossprey verdicts, fail-closed on clean installs when the registry cannot identify the package |
 | Sandbox detonation of non-clean npm and PyPI packages, local Docker | **live (opt-in)** | `backend/app/sandbox.py`, hardened images in `sandbox/`; gates the verdict |
-| Sandbox detonation on Modal, cold path | **built, not deployed** | `modal_worker/detonate.py` + `POST /v1/detonations/{id}`; evidence and retroactive response only, awaiting `modal deploy` |
+| Sandbox detonation on Modal, cold path | **worker live, not yet wired** | `modal_worker/detonate.py` is deployed and verified against real packages; the gateway callback needs `PUBLIC_BASE_URL`, which needs a hosted gateway |
 | PATH wrap for bare package-manager installs | **live (opt-in)** | `juno wrap on` → `.junoguard/bin` shims; absolute paths still bypass |
 | Cursor shell install gate | **live (opt-in via init)** | `beforeShellExecution` deny for ungated npm/pnpm/yarn/pip installs; `failClosed: true` |
 | Guarded JS installs default to `--ignore-scripts` | **live** | `juno npm|pnpm …` adds `--ignore-scripts` unless overridden |

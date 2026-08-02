@@ -38,7 +38,13 @@ Everything above `--- serving layer ---` is plain Python with no Modal imports,
 so the report shaping is unit-tested in backend/tests without a deployment.
 """
 
-from __future__ import annotations
+# No `from __future__ import annotations` here, deliberately. FastAPI resolves
+# an endpoint's annotations against module globals, and this file imports
+# FastAPI inside web() so the deploying machine does not need it installed.
+# With postponed evaluation, `request: Request` becomes the unresolvable string
+# "Request", FastAPI falls back to treating it as a query parameter, and every
+# POST returns 422 "field required". Native 3.10+ syntax covers everything used
+# below, so the import buys nothing and costs that.
 
 import os
 import re
@@ -80,10 +86,9 @@ def build_canaries(nonce: str | None = None) -> dict[str, str]:
     seed = nonce or secrets.token_hex(16)
     return {name: f"{CANARY_PREFIX}-{seed}-{name.lower()}" for name in CANARY_NAMES}
 
-# Directories a package install is expected to touch. A write anywhere else is
-# worth naming.
-EXPECTED_PREFIXES = ("/work/node_modules", "/work/package.json", "/work/package-lock.json",
-                     "/work/.package-lock.json", "/tmp", "/root/.npm", "/root/.cache")
+# The extracted package tree and the artifact we put there. A write anywhere
+# else — /root, /etc, a sibling of the package — is worth naming.
+EXPECTED_PREFIXES = ("/work/package", "/work/artifact", "/root/.npm", "/root/.cache")
 
 # stderr/stdout fragments that mean the install reached for the network. With
 # egress blocked these are failures, and the failure is the signal.
@@ -96,18 +101,76 @@ NETWORK_MARKERS = (
 # --- plain core (no Modal imports; unit-tested in backend/tests) --------------
 
 
-def install_argv(ecosystem: str, package: str, version: str | None) -> list[str]:
-    """The command whose behaviour we are observing.
+def lifecycle_argv(script: str) -> list[str]:
+    """Run one declared lifecycle script inside the extracted package.
 
-    Lifecycle scripts are deliberately left enabled — they are the thing worth
-    watching. That is the entire reason this runs in a disposable sandbox with
-    no network rather than on anyone's machine.
+    The package is *not* installed with `npm install`. A network-blocked
+    container cannot reach the registry, so npm would fail to resolve anything
+    and no package code would run at all — the first version of this reported
+    "attempted egress" for every package on earth, and that egress was npm's,
+    not the package's.
+
+    Instead the artifact is fetched and digest-verified outside the sandbox,
+    extracted inside it, and its declared hooks are executed directly. That
+    observes the thing worth observing, and it makes an egress attempt mean
+    something: nothing else in the container has any reason to touch the
+    network.
     """
-    spec = f"{package}@{version}" if version else package
-    if ecosystem == "npm":
-        return ["npm", "install", "--no-audit", "--no-fund", "--foreground-scripts", spec]
-    pyspec = f"{package}=={version}" if version else package
-    return ["pip", "install", "--no-input", "--disable-pip-version-check", pyspec]
+    return ["sh", "-lc", f"cd /work/package && {script}"]
+
+
+def verify_digest(data: bytes, algorithm: str, expected: str) -> bool:
+    """Is this the artifact the registry published?
+
+    Fetching happens outside the sandbox, so the bytes must be pinned to what
+    the registry says they are. Otherwise the thing being detonated is whatever
+    answered the HTTP request, which is a different experiment.
+    """
+    import base64
+    import hashlib
+
+    digest = hashlib.new(algorithm, data).digest()
+    if expected.startswith(f"{algorithm}-"):  # npm `integrity`: sha512-<base64>
+        return base64.b64encode(digest).decode() == expected.split("-", 1)[1]
+    return digest.hex() == expected  # npm `shasum` / PyPI `digests`: hex
+
+
+def npm_artifact(package: str, version: str | None) -> tuple[str, str, str, str]:
+    """(tarball url, resolved version, digest algorithm, expected digest)."""
+    import httpx
+
+    base = os.environ.get("NPM_REGISTRY_URL", "https://registry.npmjs.org").rstrip("/")
+    from urllib.parse import quote
+
+    coordinate = quote(package, safe="@")
+    url = f"{base}/{coordinate}/{version}" if version else f"{base}/{coordinate}/latest"
+    meta = httpx.get(url, timeout=20.0, follow_redirects=True).raise_for_status().json()
+    dist = meta.get("dist") or {}
+    integrity = dist.get("integrity")
+    if integrity and "-" in integrity:
+        return dist["tarball"], meta["version"], integrity.split("-", 1)[0], integrity
+    return dist["tarball"], meta["version"], "sha1", dist["shasum"]
+
+
+def pypi_artifact(package: str, version: str | None) -> tuple[str, str, str, str]:
+    import httpx
+
+    base = os.environ.get("PYPI_URL", "https://pypi.org").rstrip("/")
+    from urllib.parse import quote
+
+    path = f"/pypi/{quote(package)}/{version}/json" if version else f"/pypi/{quote(package)}/json"
+    meta = httpx.get(f"{base}{path}", timeout=20.0, follow_redirects=True).raise_for_status().json()
+    resolved = meta["info"]["version"]
+    files = meta.get("urls") or []
+    # Prefer an sdist: it is the one that can carry a setup.py worth watching.
+    chosen = next((f for f in files if f.get("packagetype") == "sdist"), None) or (
+        files[0] if files else None
+    )
+    if not chosen:
+        raise RuntimeError(f"no distribution files published for {package} {resolved}")
+    digests = chosen.get("digests") or {}
+    algorithm = "sha256" if "sha256" in digests else next(iter(digests), "md5")
+    return chosen["url"], resolved, algorithm, digests[algorithm]
 
 
 def clamp(text: str, limit: int = MAX_OUTPUT_CHARS) -> str:
@@ -265,11 +328,25 @@ if modal is not None:
 
         sandbox = None
         try:
+            # 1. Fetch the artifact out here, where there *is* network, and pin
+            #    it to the digest the registry published. The sandbox never
+            #    talks to a registry, so anything it does reach for is the
+            #    package's own doing.
+            fetch = npm_artifact if ecosystem == "npm" else pypi_artifact
+            tarball_url, version, algorithm, expected = fetch(package, version)
+            blob = httpx.get(tarball_url, timeout=60.0, follow_redirects=True)
+            blob.raise_for_status()
+            artifact = blob.content
+            if not verify_digest(artifact, algorithm, expected):
+                raise RuntimeError(
+                    f"{package}@{version} does not match its published {algorithm} digest"
+                )
+
             sandbox = modal.Sandbox.create(
                 image=sandbox_image,
                 app=app,
-                # The load-bearing line. Egress is denied, so any attempt fails
-                # loudly and the failure itself becomes evidence.
+                # The load-bearing line. Egress is denied, and nothing in here
+                # has a legitimate reason to want it.
                 block_network=True,
                 timeout=SANDBOX_TIMEOUT,
                 # Fakes, so a package that reads them gives itself away.
@@ -277,30 +354,51 @@ if modal is not None:
                 workdir="/work",
             )
 
-            # Baseline of what exists before the install.
-            before = sandbox.exec("find", "/work", "/root", "/etc", "-type", "f")
-            before_paths = set(before.stdout.read().splitlines())
+            # 2. Hand the verified bytes in, and unpack them.
+            with sandbox.open("/work/artifact", "wb") as handle:
+                handle.write(artifact)
+            unpack = sandbox.exec("sh", "-lc", "cd /work && tar -xzf artifact")
+            unpack_output = (unpack.stdout.read() or "") + (unpack.stderr.read() or "")
+            unpack.wait()
 
-            proc = sandbox.exec(*install_argv(ecosystem, package, version))
-            output = (proc.stdout.read() or "") + (proc.stderr.read() or "")
-            exit_code = proc.wait()
+            # 3. Read the manifest to learn which hooks it declares.
+            import json as _json
 
-            after = sandbox.exec("find", "/work", "/root", "/etc", "-type", "f")
-            written = sorted(set(after.stdout.read().splitlines()) - before_paths)
-
-            # The package's own declared lifecycle hooks — deterministic, and a
-            # useful cross-check on what the output suggests.
             package_json = None
-            if ecosystem == "npm":
-                cat = sandbox.exec("cat", f"/work/node_modules/{package}/package.json")
-                raw = cat.stdout.read()
-                if raw:
-                    import json as _json
+            manifest = sandbox.exec("sh", "-lc", "cat /work/package/package.json 2>/dev/null")
+            raw = manifest.stdout.read()
+            manifest.wait()
+            if raw.strip():
+                try:
+                    package_json = _json.loads(raw)
+                except ValueError:
+                    package_json = None
+            if ecosystem == "pypi":
+                # An sdist has no package.json; setup.py is the equivalent hook
+                # and it executes on build.
+                probe = sandbox.exec("sh", "-lc", "ls /work/*/setup.py 2>/dev/null | head -1")
+                if probe.stdout.read().strip():
+                    package_json = {"scripts": {"install": "python setup.py --version"}}
+                probe.wait()
 
-                    try:
-                        package_json = _json.loads(raw)
-                    except ValueError:
-                        package_json = None
+            # 4. Baseline the filesystem, then run each declared hook.
+            before = sandbox.exec("sh", "-lc", "find /work /root /etc /tmp -type f 2>/dev/null")
+            before_paths = set(before.stdout.read().splitlines())
+            before.wait()
+
+            output = unpack_output
+            exit_code = 0
+            for hook in declared_scripts(package_json):
+                script = (package_json.get("scripts") or {})[hook]
+                proc = sandbox.exec(*lifecycle_argv(script))
+                output += f"\n$ [{hook}] {script}\n"
+                output += (proc.stdout.read() or "") + (proc.stderr.read() or "")
+                code = proc.wait()
+                exit_code = code or exit_code
+
+            after = sandbox.exec("sh", "-lc", "find /work /root /etc /tmp -type f 2>/dev/null")
+            written = sorted(set(after.stdout.read().splitlines()) - before_paths)
+            after.wait()
 
             # Grep the staged tree for the canaries too, not just stdout: a
             # script that writes a credential to a file for later pickup never

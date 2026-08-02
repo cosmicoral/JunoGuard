@@ -216,12 +216,33 @@ def test_detonation_is_skipped_without_a_callback_address(monkeypatch, capsys) -
 # --- worker report shaping ----------------------------------------------------
 
 
-def test_install_argv_keeps_lifecycle_scripts_enabled() -> None:
-    """Disabling scripts would make the sandbox pointless — they are the thing
-    being observed."""
-    argv = worker.install_argv("npm", "left-pad", "1.3.0")
-    assert "--ignore-scripts" not in argv
-    assert "left-pad@1.3.0" in argv
+def test_lifecycle_scripts_run_inside_the_extracted_package() -> None:
+    """Hooks are executed directly rather than via `npm install`.
+
+    A network-blocked container cannot reach the registry, so npm would fail to
+    resolve anything and no package code would run at all — the first live run
+    reported "attempted egress" for every package, and that egress was npm's.
+    """
+    argv = worker.lifecycle_argv("node postinstall.js")
+    assert argv[0] == "sh"
+    assert "/work/package" in argv[-1]
+    assert "node postinstall.js" in argv[-1]
+
+
+def test_digest_verification_pins_the_artifact() -> None:
+    """The bytes are fetched outside the sandbox, so they must be the bytes the
+    registry published — otherwise we detonate whatever answered the request."""
+    import base64
+    import hashlib
+
+    blob = b"tarball bytes"
+    sha1 = hashlib.sha1(blob).hexdigest()
+    sha512 = "sha512-" + base64.b64encode(hashlib.sha512(blob).digest()).decode()
+
+    assert worker.verify_digest(blob, "sha1", sha1)
+    assert worker.verify_digest(blob, "sha512", sha512)
+    assert not worker.verify_digest(b"substituted", "sha1", sha1)
+    assert not worker.verify_digest(b"substituted", "sha512", sha512)
 
 
 def test_severity_ladder_is_conservative() -> None:
@@ -236,7 +257,7 @@ def test_severity_ladder_is_conservative() -> None:
 
 def test_expected_install_paths_are_not_reported_as_stray_writes() -> None:
     stray = worker.unexpected_paths(
-        ["/work/node_modules/left-pad/index.js", "/root/.ssh/authorized_keys", "/tmp/build.log"]
+        ["/work/package/index.js", "/work/artifact", "/root/.ssh/authorized_keys"]
     )
     assert stray == ["/root/.ssh/authorized_keys"]
 
