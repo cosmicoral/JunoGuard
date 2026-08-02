@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { isSupabaseConfigured } from "../lib/supabase";
 import { useAuth, type OAuthProvider } from "./AuthContext";
+import { BrandMark } from "../components/BrandMark";
 
 function GoogleMark() {
   return (
@@ -47,7 +48,7 @@ export function SignIn() {
     <main className="auth-page">
       <section className="auth-card">
         <a className="auth-brand" href="/" aria-label="JunoGuard home">
-          <span className="auth-mark" aria-hidden="true"><span /><span /><span /></span>
+          <BrandMark className="auth-mark" size={25} />
           JUNOGUARD
         </a>
         <p className="auth-kicker">CONTROL PLANE ACCESS</p>

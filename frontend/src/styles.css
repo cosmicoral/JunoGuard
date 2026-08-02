@@ -1632,17 +1632,19 @@ body[data-suspended="true"] {
   padding: 28px;
   display: grid;
   place-items: center;
+  /* Deep Navy ground with an Emerald bloom, matching the landing and the
+     dashboard. This surface was still on the pre-brand near-black. */
   background:
-    radial-gradient(circle at 75% 15%, rgba(227, 179, 65, 0.12), transparent 35%),
-    linear-gradient(135deg, #080a0c, #0d1013 55%, #080a0c);
+    radial-gradient(circle at 75% 15%, rgba(0, 193, 106, 0.14), transparent 35%),
+    linear-gradient(135deg, #0b1220, #131c2c 55%, #0b1220);
 }
 
 .auth-card {
   width: min(100%, 490px);
   padding: 42px;
-  background: rgba(20, 23, 26, 0.96);
+  background: rgba(23, 32, 46, 0.96); /* Graphite */
   border: 1px solid var(--border);
-  border-top-color: rgba(227, 179, 65, 0.62);
+  border-top-color: rgba(0, 193, 106, 0.6);
   border-radius: 12px;
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
@@ -1651,7 +1653,7 @@ body[data-suspended="true"] {
   display: inline-flex;
   align-items: center;
   gap: 11px;
-  color: var(--juno);
+  color: var(--text);
   font-size: 13px;
   font-weight: 750;
   letter-spacing: 0.15em;
@@ -1819,17 +1821,23 @@ body[data-suspended="true"] {
    ========================================================================== */
 
 .landing-shell {
-  --landing-bg: #08090a;
-  --landing-ink: #f1f0eb;
-  --landing-dim: #9b9b96;
-  --landing-line: rgba(241, 240, 235, 0.16);
-  --landing-gold: #f0b82f;
-  --landing-gold-soft: #ffd66d;
+  /* JunoGuard brand board. Deep Navy ground, Emerald accent, Off White ink —
+     the same values the dashboard adopted in the :root block above, so the two
+     surfaces stop being two different products. */
+  --landing-bg: #0b1220; /* Deep Navy */
+  --landing-panel: #17202e; /* Graphite */
+  --landing-ink: #f8fafc; /* Off White */
+  /* Board Slate (#6474bb) is a chrome colour; against Deep Navy it fails as
+     body copy, so secondary text uses a lighter step off the same hue. */
+  --landing-dim: #94a3b8;
+  --landing-line: rgba(248, 250, 252, 0.14);
+  --landing-accent: #00c16a; /* Emerald Green */
+  --landing-accent-soft: #d1fae5; /* Soft Green */
   min-height: 100%;
   color: var(--landing-ink);
   background-color: var(--landing-bg);
   background-image:
-    radial-gradient(circle at 82% 8%, rgba(240, 184, 47, 0.08), transparent 24rem),
+    radial-gradient(circle at 82% 8%, rgba(0, 193, 106, 0.1), transparent 24rem),
     linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
   background-size: auto, 54px 54px, 54px 54px;
@@ -1858,11 +1866,13 @@ body[data-suspended="true"] {
   align-items: center;
   gap: 12px;
   justify-self: start;
-  color: var(--landing-gold) !important;
-  font-family: var(--mono);
-  font-size: 14px;
+  /* Ink, not accent. In the brand board the wordmark and the ring are the
+     neutral and the dot is the only emerald — that contrast is the mark. */
+  color: var(--landing-ink) !important;
+  font-family: var(--sans);
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.2em;
 }
 
 .landing-mark {
@@ -1899,14 +1909,14 @@ body[data-suspended="true"] {
 
 .landing-nav nav a:hover,
 .text-action:hover {
-  color: var(--landing-gold);
+  color: var(--landing-accent);
 }
 
 .nav-console {
   justify-self: end;
-  border: 1px solid rgba(240, 184, 47, 0.5);
+  border: 1px solid rgba(0, 193, 106, 0.5);
   padding: 10px 14px;
-  color: var(--landing-gold) !important;
+  color: var(--landing-accent) !important;
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -1914,7 +1924,7 @@ body[data-suspended="true"] {
 }
 
 .nav-console:hover {
-  background: var(--landing-gold);
+  background: var(--landing-accent);
   color: #17130a !important;
 }
 
@@ -1936,7 +1946,7 @@ body[data-suspended="true"] {
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.16em;
-  color: var(--landing-gold);
+  color: var(--landing-accent);
 }
 
 .hero-copy h1 {
@@ -1974,8 +1984,8 @@ body[data-suspended="true"] {
   justify-content: space-between;
   gap: 42px;
   color: #17130a !important;
-  background: var(--landing-gold);
-  border: 1px solid var(--landing-gold);
+  background: var(--landing-accent);
+  border: 1px solid var(--landing-accent);
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 700;
@@ -1985,7 +1995,7 @@ body[data-suspended="true"] {
 
 .primary-action:hover {
   background: transparent;
-  color: var(--landing-gold) !important;
+  color: var(--landing-accent) !important;
 }
 
 .text-action {
@@ -1997,9 +2007,9 @@ body[data-suspended="true"] {
 
 .hero-console-wrap {
   min-width: 0;
-  border-left: 1px solid rgba(240, 184, 47, 0.46);
+  border-left: 1px solid rgba(0, 193, 106, 0.46);
   padding: 0 0 40px 36px;
-  background: radial-gradient(circle at 80% 20%, rgba(240, 184, 47, 0.1), transparent 44%);
+  background: radial-gradient(circle at 80% 20%, rgba(0, 193, 106, 0.1), transparent 44%);
 }
 
 .console-caption {
@@ -2013,7 +2023,7 @@ body[data-suspended="true"] {
 .decision-console {
   background: #0d0f10;
   border: 1px solid #37393a;
-  box-shadow: 18px 18px 0 rgba(240, 184, 47, 0.05);
+  box-shadow: 18px 18px 0 rgba(0, 193, 106, 0.05);
 }
 
 .console-bar {
@@ -2035,7 +2045,7 @@ body[data-suspended="true"] {
   color: #dddcd7;
 }
 
-.console-project .landing-mark { width: 19px; height: 19px; color: var(--landing-gold); }
+.console-project .landing-mark { width: 19px; height: 19px; color: var(--landing-ink); }
 .console-project .landing-mark > span:nth-child(1) { width: 19px; height: 19px; }
 .console-project .landing-mark > span:nth-child(2) { width: 11px; height: 11px; }
 .console-project .landing-mark > span:nth-child(3) { width: 4px; height: 4px; }
@@ -2105,7 +2115,7 @@ body[data-suspended="true"] {
 .console-target { color: #d0d1ce; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .console-row strong { text-align: right; font-size: 9px; letter-spacing: 0.08em; }
 .console-row strong[data-tone="allow"] { color: #72d780; }
-.console-row strong[data-tone="flag"] { color: var(--landing-gold); }
+.console-row strong[data-tone="flag"] { color: var(--landing-accent); }
 .console-row strong[data-tone="block"] { color: #ff675f; }
 
 .blast-preview {
@@ -2127,7 +2137,7 @@ body[data-suspended="true"] {
   grid-template-columns: 108px 1fr;
   align-items: center;
   row-gap: 18px;
-  border-top: 1px solid var(--landing-gold);
+  border-top: 1px solid var(--landing-accent);
   border-bottom: 1px solid var(--landing-line);
   padding: 22px max(32px, calc((100vw - 1400px) / 2));
   font-family: var(--mono);
@@ -2172,7 +2182,7 @@ body[data-suspended="true"] {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .system-mark:hover { color: var(--landing-gold); }
+  .system-mark:hover { color: var(--landing-accent); }
   .system-mark:hover b { color: #cfcdc6; }
 }
 
@@ -2257,7 +2267,7 @@ body[data-suspended="true"] {
   display: grid;
   place-items: center;
   border: 1px solid #595a57;
-  color: var(--landing-gold);
+  color: var(--landing-accent);
   font-family: var(--mono);
   font-size: 14px;
 }
@@ -2295,7 +2305,7 @@ body[data-suspended="true"] {
   font-size: 13px;
 }
 
-.gate-card li span { color: var(--landing-gold); font-family: var(--mono); font-size: 9px; }
+.gate-card li span { color: var(--landing-accent); font-family: var(--mono); font-size: 9px; }
 
 .rate-plot {
   grid-column: 2;
@@ -2314,14 +2324,14 @@ body[data-suspended="true"] {
   left: 0;
   right: 0;
   top: 53px;
-  border-top: 1px dashed rgba(240, 184, 47, 0.6);
+  border-top: 1px dashed rgba(0, 193, 106, 0.6);
 }
 
 .plot-limit {
   position: absolute;
   top: 37px;
   right: 0;
-  color: var(--landing-gold);
+  color: var(--landing-accent);
   font-family: var(--mono);
   font-size: 8px;
   letter-spacing: 0.08em;
@@ -2337,7 +2347,7 @@ body[data-suspended="true"] {
 .rate-plot i:nth-of-type(11) { background: #ff675f; }
 
 .architecture-section {
-  border-top: 1px solid var(--landing-gold);
+  border-top: 1px solid var(--landing-accent);
   border-bottom: 1px solid var(--landing-line);
   padding: 140px 0;
 }
@@ -2380,7 +2390,7 @@ body[data-suspended="true"] {
 .flow span,
 .flow small { color: #858681; font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; }
 .flow strong { color: #deddd7; font-family: var(--mono); font-size: 15px; letter-spacing: 0.12em; }
-.flow-core { background: var(--landing-gold); }
+.flow-core { background: var(--landing-accent); }
 .flow-core span, .flow-core small { color: #6a5215; }
 .flow-core strong { color: #17130a; }
 
@@ -2392,7 +2402,7 @@ body[data-suspended="true"] {
 }
 
 .principles > div { display: flex; flex-direction: column; gap: 10px; }
-.principles b { color: var(--landing-gold); font-size: 28px; font-weight: 350; }
+.principles b { color: var(--landing-accent); font-size: 28px; font-weight: 350; }
 .principles span { color: #868681; font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
 .principles p { margin: 0; color: #aaa9a4; line-height: 1.65; }
 
@@ -2433,7 +2443,7 @@ body[data-suspended="true"] {
 .landing-footer > span { text-align: right; }
 
 .landing-shell a:focus-visible {
-  outline: 2px solid var(--landing-gold);
+  outline: 2px solid var(--landing-accent);
   outline-offset: 4px;
 }
 
@@ -2556,7 +2566,7 @@ body[data-suspended="true"] {
 
 .install-command code span {
   margin-right: 10px;
-  color: var(--landing-gold);
+  color: var(--landing-accent);
   user-select: none;
 }
 
@@ -2575,7 +2585,7 @@ body[data-suspended="true"] {
 }
 
 .install-command button:hover {
-  background: var(--landing-gold);
+  background: var(--landing-accent);
   color: #17130a;
 }
 

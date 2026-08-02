@@ -9,13 +9,21 @@ type BrandProps = {
 const RING_PATH = "M21.04 24.06A9.5 9.5 0 1 1 25.22 18.3";
 const DOT = { cx: 21.04, cy: 24.06, r: 3.85 };
 
-function tone(suspended: boolean | undefined) {
+/**
+ * Two tones, not one. In the brand board the ring is the neutral — white on
+ * dark, near-black on light — and only the dot is emerald. Painting both green
+ * loses the whole idea of the mark: a single live point closing an open ring.
+ * The ring inherits, so the mark works on any surface.
+ */
+function ringTone(suspended: boolean | undefined) {
+  return suspended ? "var(--block, #f85149)" : "currentColor";
+}
+
+function dotTone(suspended: boolean | undefined) {
   return suspended ? "var(--block, #f85149)" : "var(--accent, #00C16A)";
 }
 
 export function BrandMark({ className, size = 32, suspended }: BrandProps) {
-  const color = tone(suspended);
-
   return (
     <svg
       className={className}
@@ -28,23 +36,25 @@ export function BrandMark({ className, size = 32, suspended }: BrandProps) {
     >
       <path
         d={RING_PATH}
-        stroke={color}
+        stroke={ringTone(suspended)}
         strokeWidth="4.75"
         strokeLinecap="round"
       />
-      <circle cx={DOT.cx} cy={DOT.cy} r={DOT.r} fill={color} />
+      <circle cx={DOT.cx} cy={DOT.cy} r={DOT.r} fill={dotTone(suspended)} />
     </svg>
   );
 }
 
 export function BrandLockup({ className, size = 28, suspended }: BrandProps) {
-  const color = tone(suspended);
   const wordmarkSize = typeof size === "number" ? `${Math.max(11, size * 0.46)}px` : undefined;
+  // No colour forced here. The wordmark is off-white in the brand board, not
+  // emerald; it inherits so the lockup sits correctly on navy or on white, and
+  // the mark's ring inherits the same neutral.
   const style: CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
     gap: "0.58em",
-    color,
+    color: suspended ? "var(--block, #f85149)" : undefined,
   };
 
   return (
@@ -53,8 +63,9 @@ export function BrandLockup({ className, size = 28, suspended }: BrandProps) {
       <span
         aria-hidden="true"
         style={{
-          color,
-          fontFamily: "var(--mono)",
+          // Sans, not mono. The board sets the wordmark in Söhne; Inter is the
+          // licensed stand-in it already names for body and UI.
+          fontFamily: "var(--sans)",
           fontSize: wordmarkSize,
           fontWeight: 700,
           letterSpacing: "0.18em",

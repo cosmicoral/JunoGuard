@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { BrandMark } from "../components/BrandMark";
 
 let pendingCode: string | null = null;
 let pendingExchange: Promise<void> | null = null;
@@ -50,7 +51,7 @@ export function AuthCallback() {
     <main className="auth-page">
       <section className="auth-card" aria-live="polite">
         <a className="auth-brand" href="/" aria-label="JunoGuard home">
-          <span className="auth-mark" aria-hidden="true"><span /><span /><span /></span>
+          <BrandMark className="auth-mark" size={25} />
           JUNOGUARD
         </a>
         {error ? (
