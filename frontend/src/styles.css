@@ -2209,8 +2209,9 @@ body[data-suspended="true"] {
   --landing-bg: #0b1220; /* Deep Navy */
   --landing-panel: #17202e; /* Graphite */
   --landing-ink: #f8fafc; /* Off White */
-  /* Board Slate (#6474bb) is a chrome colour; against Deep Navy it fails as
-     body copy, so secondary text uses a lighter step off the same hue. */
+  --landing-slate: #6474bb; /* Slate — chrome and dividers, per the board */
+  /* Board Slate fails contrast as body copy on Deep Navy, so secondary text
+     uses a lighter step off the same hue. Slate stays available above. */
   --landing-dim: #94a3b8;
   --landing-line: rgba(248, 250, 252, 0.14);
   --landing-accent: #00c16a; /* Emerald Green */
@@ -2294,20 +2295,25 @@ body[data-suspended="true"] {
   color: var(--landing-accent);
 }
 
+/* Filled Emerald pill, as the board's nav CTA. An outline here read as a
+   secondary control next to a filled hero button making the same offer. */
 .nav-console {
   justify-self: end;
-  border: 1px solid rgba(0, 193, 106, 0.5);
-  padding: 10px 14px;
-  color: var(--landing-accent) !important;
+  border: 1px solid var(--landing-accent);
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: var(--landing-accent);
+  color: var(--landing-bg) !important;
   font-family: var(--mono);
   font-size: 11px;
+  font-weight: 700;
   letter-spacing: 0.08em;
   transition: background-color 160ms ease, color 160ms ease;
 }
 
 .nav-console:hover {
-  background: var(--landing-accent);
-  color: #17130a !important;
+  background: transparent;
+  color: var(--landing-accent) !important;
 }
 
 .landing-hero {
@@ -2341,10 +2347,34 @@ body[data-suspended="true"] {
   letter-spacing: -0.045em;
 }
 
+/* The brand board's positioning line, set exactly as it appears there:
+   "DIGITAL TRUST. CONTINUOUSLY." with only TRUST in Emerald. */
+.hero-tagline {
+  margin: 0 0 26px;
+  color: var(--landing-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+
+.hero-tagline em {
+  color: var(--landing-accent);
+  font-style: normal;
+  font-weight: 700;
+}
+
+/* One Emerald word per headline — the board's signature treatment. */
+.hero-copy h1 em {
+  color: var(--landing-accent);
+  font-style: normal;
+}
+
 .hero-lede {
   max-width: 540px;
   margin: 0;
-  color: #c1c0ba;
+  color: var(--landing-dim);
   font-family: var(--sans);
   font-size: clamp(1.05rem, 1.2vw, 1.2rem);
   font-weight: 500;
@@ -2365,9 +2395,11 @@ body[data-suspended="true"] {
   align-items: center;
   justify-content: space-between;
   gap: 42px;
-  color: #17130a !important;
+  /* Emerald fill, Deep Navy label — the board's primary button. */
+  color: var(--landing-bg) !important;
   background: var(--landing-accent);
   border: 1px solid var(--landing-accent);
+  border-radius: 8px;
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 700;
@@ -2380,11 +2412,28 @@ body[data-suspended="true"] {
   color: var(--landing-accent) !important;
 }
 
-.text-action {
-  color: #c8c7c1;
-  font-size: 13px;
-  border-bottom: 1px solid #5c5c58;
-  padding-bottom: 4px;
+/* The board pairs the filled button with an outlined one, not a text link. */
+.secondary-action {
+  min-height: 52px;
+  padding: 0 22px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--landing-ink);
+  background: transparent;
+  border: 1px solid var(--landing-line);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .secondary-action:hover {
+    border-color: var(--landing-accent);
+    color: var(--landing-accent);
+  }
 }
 
 .hero-console-wrap {

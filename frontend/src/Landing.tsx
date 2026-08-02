@@ -124,8 +124,17 @@ export function Landing() {
           transition={{ duration: 0.65, ease: [0.23, 1, 0.32, 1] }}
         >
           {/* No lockup here — the nav carries the brand 40px above it, and
-              repeating it just pushes the headline down the fold. */}
-          <h1>The control plane between your agent and the blast radius.</h1>
+              repeating it just pushes the headline down the fold. The brand
+              board's positioning line takes the eyebrow slot instead. */}
+          <p className="hero-tagline">
+            DIGITAL <em>TRUST</em>. CONTINUOUSLY.
+          </p>
+          {/* The board sets one word of every headline in Emerald. Here it is
+              "control plane" — green reads as allowed across this product, so
+              it belongs on what Juno is, not on the blast radius. */}
+          <h1>
+            The <em>control plane</em> between your agent and the blast radius.
+          </h1>
           <p className="hero-lede">
             Every install, model call, and policy breach — decided before it
             lands. One deterministic gate. Allow, flag, or stop.
@@ -134,7 +143,7 @@ export function Landing() {
             <a className="primary-action" href={consoleHref}>
               {consoleLabel} <span>→</span>
             </a>
-            <a className="text-action" href="#how">
+            <a className="secondary-action" href="#how">
               See the gate in action
             </a>
           </div>
