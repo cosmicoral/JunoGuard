@@ -16,8 +16,9 @@ import os
 import subprocess
 import tempfile
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Literal
 from urllib.parse import quote, urlparse
 
 import httpx
@@ -26,13 +27,33 @@ from . import config
 
 RESULT_PREFIX = "JUNO_SANDBOX_RESULT="
 DOWNLOAD_TIMEOUT_SECONDS = 10.0
+Ecosystem = Literal["npm", "pypi"]
+
+
+@dataclass(frozen=True)
+class Artifact:
+    """An immutable registry artifact prepared for one sandbox run."""
+
+    ecosystem: Ecosystem
+    version: str
+    kind: Literal["npm-tarball", "pypi-sdist", "pypi-wheel"]
+    url: str
+    digest_algorithm: str
+    digest: bytes
+    suffix: str
+
+
+@dataclass(frozen=True)
+class PreparedArtifact:
+    descriptor: Artifact
+    path: Path
 
 
 class SandboxError(RuntimeError):
     """A detonation could not be completed safely."""
 
 
-def _registry_metadata(package: str, version: str | None) -> dict[str, Any]:
+def _npm_metadata(package: str, version: str | None) -> Artifact:
     coordinate = version or "latest"
     url = (
         f"{config.NPM_REGISTRY_URL}/{quote(package.strip(), safe='@')}/"
@@ -48,21 +69,100 @@ def _registry_metadata(package: str, version: str | None) -> dict[str, Any]:
     shasum = str(dist.get("shasum") or "").strip()
     if not resolved or not tarball or not (integrity or shasum):
         raise SandboxError("registry metadata lacks a version, tarball, or package digest")
-    return {
-        "version": resolved,
-        "tarball": tarball,
-        "integrity": integrity,
-        "shasum": shasum,
-    }
+    algorithm, digest = _npm_digest(integrity, shasum)
+    return Artifact(
+        ecosystem="npm",
+        version=resolved,
+        kind="npm-tarball",
+        url=tarball,
+        digest_algorithm=algorithm,
+        digest=digest,
+        suffix=".tgz",
+    )
 
 
-def _allowed_tarball(url: str) -> bool:
-    registry = urlparse(config.NPM_REGISTRY_URL)
+def _pypi_metadata(package: str, version: str | None) -> Artifact:
+    encoded = quote(package.strip(), safe="")
+    suffix = f"/{quote(version, safe='')}" if version else ""
+    response = httpx.get(
+        f"{config.PYPI_URL}/pypi/{encoded}{suffix}/json",
+        timeout=DOWNLOAD_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    body = response.json()
+    info = body.get("info") if isinstance(body.get("info"), dict) else {}
+    resolved = str(info.get("version") or version or "").strip()
+    files = body.get("urls") if isinstance(body.get("urls"), list) else []
+
+    sdist = next(
+        (
+            item
+            for item in files
+            if isinstance(item, dict)
+            and item.get("packagetype") == "sdist"
+            and str(item.get("filename") or "").endswith((".tar.gz", ".zip"))
+        ),
+        None,
+    )
+    wheel = next(
+        (
+            item
+            for item in files
+            if isinstance(item, dict)
+            and item.get("packagetype") == "bdist_wheel"
+            and str(item.get("filename") or "").endswith("-py3-none-any.whl")
+        ),
+        None,
+    )
+    selected = sdist or wheel
+    if not resolved or not isinstance(selected, dict):
+        raise SandboxError(
+            "PyPI release has no supported sdist or pure py3-none-any wheel"
+        )
+
+    filename = str(selected.get("filename") or "")
+    artifact_url = str(selected.get("url") or "").strip()
+    digests = selected.get("digests") if isinstance(selected.get("digests"), dict) else {}
+    sha256 = str(digests.get("sha256") or "").lower()
+    if (
+        not artifact_url
+        or len(sha256) != 64
+        or any(char not in "0123456789abcdef" for char in sha256)
+    ):
+        raise SandboxError("PyPI artifact metadata lacks a valid SHA-256 digest")
+
+    return Artifact(
+        ecosystem="pypi",
+        version=resolved,
+        kind="pypi-sdist" if selected is sdist else "pypi-wheel",
+        url=artifact_url,
+        digest_algorithm="sha256",
+        digest=bytes.fromhex(sha256),
+        suffix=".tar.gz" if filename.endswith(".tar.gz") else Path(filename).suffix,
+    )
+
+
+def _registry_metadata(
+    package: str, ecosystem: Ecosystem, version: str | None
+) -> Artifact:
+    if ecosystem == "npm":
+        return _npm_metadata(package, version)
+    if ecosystem == "pypi":
+        return _pypi_metadata(package, version)
+    raise SandboxError(f"unsupported sandbox ecosystem: {ecosystem}")
+
+
+def _allowed_artifact(url: str, ecosystem: Ecosystem) -> bool:
+    registry_url = config.NPM_REGISTRY_URL if ecosystem == "npm" else config.PYPI_URL
+    registry = urlparse(registry_url)
     candidate = urlparse(url)
+    allowed_hosts = {registry.hostname}
+    if ecosystem == "pypi" and registry.hostname in {"pypi.org", "www.pypi.org"}:
+        allowed_hosts.add("files.pythonhosted.org")
     return (
         candidate.scheme == "https"
         and candidate.hostname is not None
-        and candidate.hostname == registry.hostname
+        and candidate.hostname in allowed_hosts
         and candidate.username is None
         and candidate.password is None
     )
@@ -76,8 +176,7 @@ def _chunks(url: str) -> Iterator[bytes]:
                 yield chunk
 
 
-def _expected_digest(metadata: dict[str, Any]) -> tuple[str, bytes]:
-    integrity = metadata["integrity"]
+def _npm_digest(integrity: str, shasum: str) -> tuple[str, bytes]:
     if "-" in integrity:
         algorithm, encoded = integrity.split("-", 1)
         if algorithm in {"sha256", "sha384", "sha512"}:
@@ -86,40 +185,48 @@ def _expected_digest(metadata: dict[str, Any]) -> tuple[str, bytes]:
             except (binascii.Error, ValueError) as exc:
                 raise SandboxError("registry package integrity is malformed") from exc
 
-    shasum = metadata["shasum"].lower()
+    shasum = shasum.lower()
     if len(shasum) == 40 and all(char in "0123456789abcdef" for char in shasum):
         return "sha1", bytes.fromhex(shasum)
     raise SandboxError("registry package digest uses an unsupported format")
 
 
-def _download(package: str, version: str | None, destination: Path) -> str:
+def _download(
+    package: str, ecosystem: Ecosystem, version: str | None, directory: Path
+) -> PreparedArtifact:
     try:
-        metadata = _registry_metadata(package, version)
-        if not _allowed_tarball(metadata["tarball"]):
-            raise SandboxError("registry tarball URL leaves the configured registry origin")
-        algorithm, expected = _expected_digest(metadata)
-        digest = hashlib.new(algorithm)
+        descriptor = _registry_metadata(package, ecosystem, version)
+        if not _allowed_artifact(descriptor.url, ecosystem):
+            raise SandboxError("registry artifact URL leaves the configured registry origin")
+        digest = hashlib.new(descriptor.digest_algorithm)
         size = 0
+        destination = directory / f"package{descriptor.suffix}"
         with destination.open("wb") as artifact:
-            for chunk in _chunks(metadata["tarball"]):
+            for chunk in _chunks(descriptor.url):
                 size += len(chunk)
                 if size > config.SANDBOX_MAX_ARTIFACT_BYTES:
                     raise SandboxError(
-                        f"package tarball exceeds {config.SANDBOX_MAX_ARTIFACT_BYTES} bytes"
+                        f"package artifact exceeds {config.SANDBOX_MAX_ARTIFACT_BYTES} bytes"
                     )
                 digest.update(chunk)
                 artifact.write(chunk)
-        if digest.digest() != expected:
+        if digest.digest() != descriptor.digest:
             raise SandboxError("downloaded package does not match its registry digest")
         destination.chmod(0o444)
-        return str(metadata["version"])
+        return PreparedArtifact(descriptor=descriptor, path=destination)
     except SandboxError:
         raise
     except Exception as exc:  # noqa: BLE001 - fail closed behind one typed error
         raise SandboxError(f"package artifact could not be prepared: {exc}") from exc
 
 
-def _docker_command(name: str, artifact: Path) -> list[str]:
+def _docker_command(name: str, artifact: PreparedArtifact) -> list[str]:
+    if artifact.descriptor.ecosystem == "npm":
+        destination = "/input/package.tgz"
+        image = config.SANDBOX_IMAGE
+    else:
+        destination = f"/input/package{artifact.descriptor.suffix}"
+        image = config.SANDBOX_PYPI_IMAGE
     return [
         config.SANDBOX_DOCKER_BIN,
         "run",
@@ -137,8 +244,8 @@ def _docker_command(name: str, artifact: Path) -> list[str]:
         "--user=65534:65534",
         "--tmpfs=/work:rw,nosuid,noexec,size=128m,mode=1777",
         "--tmpfs=/tmp:rw,nosuid,noexec,size=32m,mode=1777",
-        f"--mount=type=bind,src={artifact},dst=/input/package.tgz,readonly",
-        config.SANDBOX_IMAGE,
+        f"--mount=type=bind,src={artifact.path},dst={destination},readonly",
+        image,
     ]
 
 
@@ -155,7 +262,7 @@ def _remove_container(name: str) -> None:
         pass
 
 
-def _run(artifact: Path) -> dict[str, Any]:
+def _run(artifact: PreparedArtifact) -> dict[str, Any]:
     name = f"junoguard-{uuid.uuid4().hex[:16]}"
     try:
         process = subprocess.run(
@@ -194,19 +301,21 @@ def _run(artifact: Path) -> dict[str, Any]:
 
 def detonate(package: str, ecosystem: str, version: str | None = None) -> dict[str, Any]:
     """Download, verify, and execute lifecycle scripts in the sandbox."""
-    if ecosystem != "npm":
-        raise SandboxError("sandbox detonation currently supports npm packages only")
+    if ecosystem not in {"npm", "pypi"}:
+        raise SandboxError(f"unsupported sandbox ecosystem: {ecosystem}")
 
     with tempfile.TemporaryDirectory(prefix="junoguard-sandbox-") as directory:
-        artifact = Path(directory) / "package.tgz"
-        resolved = _download(package, version, artifact)
-        result = _run(artifact)
+        prepared = _download(package, ecosystem, version, Path(directory))
+        if prepared.descriptor.ecosystem == "pypi":
+            raise SandboxError("PyPI sandbox worker is not installed yet")
+        result = _run(prepared)
 
     return {
         **result,
         "engine": "docker",
         "package": package,
-        "version": resolved,
+        "version": prepared.descriptor.version,
+        "artifact_kind": prepared.descriptor.kind,
         "isolation": {
             "network": "none",
             "root_filesystem": "read_only",

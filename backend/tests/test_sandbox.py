@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import json
 import subprocess
@@ -15,29 +14,46 @@ import pytest
 from app import config, sandbox
 
 
+def npm_artifact(url: str, payload: bytes) -> sandbox.Artifact:
+    return sandbox.Artifact(
+        ecosystem="npm",
+        version="1.2.3",
+        kind="npm-tarball",
+        url=url,
+        digest_algorithm="sha512",
+        digest=hashlib.sha512(payload).digest(),
+        suffix=".tgz",
+    )
+
+
+def prepared_npm_artifact(path: Path) -> sandbox.PreparedArtifact:
+    return sandbox.PreparedArtifact(
+        descriptor=npm_artifact(
+            "https://registry.npmjs.org/example/-/example-1.2.3.tgz",
+            b"fixture",
+        ),
+        path=path,
+    )
+
+
 def test_download_verifies_registry_digest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     payload = b"a harmless package tarball fixture"
-    integrity = base64.b64encode(hashlib.sha512(payload).digest()).decode()
     monkeypatch.setattr(
         sandbox,
         "_registry_metadata",
-        lambda *a, **k: {
-            "version": "1.2.3",
-            "tarball": "https://registry.npmjs.org/example/-/example-1.2.3.tgz",
-            "integrity": f"sha512-{integrity}",
-            "shasum": "",
-        },
+        lambda *a, **k: npm_artifact(
+            "https://registry.npmjs.org/example/-/example-1.2.3.tgz", payload
+        ),
     )
     monkeypatch.setattr(sandbox, "_chunks", lambda url: iter([payload[:10], payload[10:]]))
-    destination = tmp_path / "package.tgz"
 
-    resolved = sandbox._download("example", "1.2.3", destination)
+    prepared = sandbox._download("example", "npm", "1.2.3", tmp_path)
 
-    assert resolved == "1.2.3"
-    assert destination.read_bytes() == payload
-    assert destination.stat().st_mode & 0o777 == 0o444
+    assert prepared.descriptor.version == "1.2.3"
+    assert prepared.path.read_bytes() == payload
+    assert prepared.path.stat().st_mode & 0o777 == 0o444
 
 
 def test_download_rejects_tarball_off_registry(
@@ -46,21 +62,67 @@ def test_download_rejects_tarball_off_registry(
     monkeypatch.setattr(
         sandbox,
         "_registry_metadata",
-        lambda *a, **k: {
-            "version": "1.2.3",
-            "tarball": "https://attacker.invalid/payload.tgz",
-            "integrity": "sha512-ZmFrZQ==",
-            "shasum": "",
-        },
+        lambda *a, **k: npm_artifact("https://attacker.invalid/payload.tgz", b"fake"),
     )
 
     with pytest.raises(sandbox.SandboxError, match="leaves the configured registry origin"):
-        sandbox._download("example", "1.2.3", tmp_path / "package.tgz")
+        sandbox._download("example", "npm", "1.2.3", tmp_path)
+
+
+def test_pypi_metadata_prefers_sdist(monkeypatch: pytest.MonkeyPatch) -> None:
+    response = MagicMock()
+    response.json.return_value = {
+        "info": {"version": "1.2.3"},
+        "urls": [
+            {
+                "packagetype": "bdist_wheel",
+                "filename": "example-1.2.3-py3-none-any.whl",
+                "url": "https://files.pythonhosted.org/example.whl",
+                "digests": {"sha256": "11" * 32},
+            },
+            {
+                "packagetype": "sdist",
+                "filename": "example-1.2.3.tar.gz",
+                "url": "https://files.pythonhosted.org/example.tar.gz",
+                "digests": {"sha256": "22" * 32},
+            },
+        ],
+    }
+    monkeypatch.setattr(sandbox.httpx, "get", MagicMock(return_value=response))
+
+    artifact = sandbox._pypi_metadata("example", None)
+
+    assert artifact.kind == "pypi-sdist"
+    assert artifact.suffix == ".tar.gz"
+    assert artifact.digest == bytes.fromhex("22" * 32)
+
+
+def test_pypi_metadata_accepts_only_pure_python_wheel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    response = MagicMock()
+    response.json.return_value = {
+        "info": {"version": "1.2.3"},
+        "urls": [
+            {
+                "packagetype": "bdist_wheel",
+                "filename": "example-1.2.3-cp312-cp312-macosx.whl",
+                "url": "https://files.pythonhosted.org/native.whl",
+                "digests": {"sha256": "11" * 32},
+            }
+        ],
+    }
+    monkeypatch.setattr(sandbox.httpx, "get", MagicMock(return_value=response))
+
+    with pytest.raises(sandbox.SandboxError, match="no supported sdist"):
+        sandbox._pypi_metadata("example", "1.2.3")
 
 
 def test_docker_command_enforces_isolation(tmp_path: Path) -> None:
     artifact = tmp_path / "package.tgz"
-    command = sandbox._docker_command("junoguard-test", artifact)
+    command = sandbox._docker_command(
+        "junoguard-test", prepared_npm_artifact(artifact)
+    )
     joined = " ".join(command)
 
     assert "--network=none" in command
@@ -85,7 +147,7 @@ def test_run_parses_structured_container_evidence(
     )
     monkeypatch.setattr(sandbox.subprocess, "run", MagicMock(return_value=process))
 
-    assert sandbox._run(tmp_path / "package.tgz") == evidence
+    assert sandbox._run(prepared_npm_artifact(tmp_path / "package.tgz")) == evidence
 
 
 def test_timeout_force_removes_container(
@@ -100,7 +162,7 @@ def test_timeout_force_removes_container(
         return subprocess.CompletedProcess(command, 0, "", "")
 
     monkeypatch.setattr(sandbox.subprocess, "run", run)
-    result = sandbox._run(tmp_path / "package.tgz")
+    result = sandbox._run(prepared_npm_artifact(tmp_path / "package.tgz"))
 
     assert result["status"] == "timed_out"
     assert len(calls) == 2
@@ -112,9 +174,21 @@ def test_detonate_never_passes_package_name_to_docker(
 ) -> None:
     package = "example; touch /host/pwned"
 
-    def download(name: str, version: str | None, destination: Path) -> str:
+    def download(
+        name: str, ecosystem: sandbox.Ecosystem, version: str | None, directory: Path
+    ) -> sandbox.PreparedArtifact:
+        destination = directory / "package.tgz"
         destination.write_bytes(b"fixture")
-        return "1.0.0"
+        descriptor = npm_artifact(
+            "https://registry.npmjs.org/example/-/example-1.0.0.tgz",
+            b"fixture",
+        )
+        return sandbox.PreparedArtifact(
+            descriptor=sandbox.Artifact(
+                **{**descriptor.__dict__, "version": "1.0.0"}
+            ),
+            path=destination,
+        )
 
     runner = MagicMock(return_value={"status": "completed", "scripts_executed": []})
     monkeypatch.setattr(sandbox, "_download", download)
@@ -124,8 +198,8 @@ def test_detonate_never_passes_package_name_to_docker(
 
     assert result["package"] == package
     mounted_path = runner.call_args.args[0]
-    assert package not in str(mounted_path)
-    assert str(mounted_path).startswith(tempfile_prefix())
+    assert package not in str(mounted_path.path)
+    assert str(mounted_path.path).startswith(tempfile_prefix())
 
 
 def tempfile_prefix() -> str:
