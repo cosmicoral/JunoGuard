@@ -1,5 +1,8 @@
+<!-- Logo exploration 1 from the brand board: Off White ring on Deep Navy, with
+     the Emerald dot as the only accent. Ring and dot were both Emerald here,
+     which loses the contrast the mark is built on. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
   <rect width="32" height="32" rx="7" fill="#0B1220"/>
-  <path d="M21.04 24.06A9.5 9.5 0 1 1 25.22 18.3" stroke="#00C16A" stroke-width="4.75" stroke-linecap="round"/>
+  <path d="M21.04 24.06A9.5 9.5 0 1 1 25.22 18.3" stroke="#F8FAFC" stroke-width="4.75" stroke-linecap="round"/>
   <circle cx="21.04" cy="24.06" r="3.85" fill="#00C16A"/>
 </svg>
