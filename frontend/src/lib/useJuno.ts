@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { actionFromEvent, incidentFromEvent, projectFromEvent } from "./events";
-import { apiUrl, dataSource, isLive, JUNO_KEY, OPERATOR_TOKEN, supabase } from "./supabase";
+import { apiUrl, dataSource, isLive, JUNO_KEY, mode, OPERATOR_TOKEN, supabase } from "./supabase";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { AgentAction, Incident, Policy, Project } from "./types";
 import {
@@ -188,7 +188,13 @@ export function useJuno(): JunoState {
     degraded || simulating
       ? false // nothing to control: the gateway is unreachable, or this is a simulation
       : !apiUrl
-        ? true // pure mock: the toggle is local and affects nothing real
+        // A demo has no gateway and the toggle is local theatre, which is fine
+        // because the page says DEMO across the top. A *live* build with no
+        // gateway configured is a different thing entirely: the button would
+        // flip the dashboard to SUSPENDED while every agent kept running. A
+        // control that lies about the state of the world is worse than no
+        // control, so there isn't one.
+        ? mode === "demo"
         : supabase
           ? suspended
             ? role === "owner"
@@ -568,10 +574,17 @@ export function useJuno(): JunoState {
     const next = suspendedRef.current ? "active" : "suspended";
     const path = next === "suspended" ? "suspend" : "resume";
 
-    // Pure mock: flip locally. No gateway to disagree with us.
     if (!apiUrl) {
-      applyProjectStatus(next, next === "suspended");
-      setKillError(null);
+      // Demo: flip locally. There is no gateway to disagree with us, and the
+      // banner above already says none of this is real.
+      if (mode === "demo") {
+        applyProjectStatus(next, next === "suspended");
+        setKillError(null);
+        return;
+      }
+      // Live, with no gateway configured. Refuse rather than show a suspension
+      // that exists only in this browser tab.
+      setKillError("No gateway configured (VITE_API_URL) — nothing to suspend.");
       return;
     }
 
