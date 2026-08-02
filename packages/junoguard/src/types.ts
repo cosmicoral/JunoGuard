@@ -39,10 +39,38 @@ export interface CycloneDxSbom {
   };
 }
 
+export interface SandboxEvidence {
+  status: "completed" | "timed_out" | "artifact_rejected";
+  engine?: "docker";
+  package?: string;
+  version?: string;
+  scripts_executed?: Array<{
+    lifecycle: string;
+    exit_code?: number | null;
+    signal?: string | null;
+    timed_out?: boolean;
+    stdout?: string;
+    stderr?: string;
+  }>;
+  files_created?: string[];
+  observations?: string[];
+  isolation?: {
+    network?: string;
+    root_filesystem?: string;
+    capabilities?: string;
+    host_mounts?: string[];
+    memory_mb?: number;
+    cpus?: number;
+    pids?: number;
+  };
+}
+
 export interface InstallResult extends Envelope {
   verdict?: Verdict;
   /** Registry-backed package identity. Null in offline fixture mode. */
   sbom?: CycloneDxSbom | null;
+  /** Isolated npm lifecycle evidence when sandbox detonation is enabled. */
+  sandbox?: SandboxEvidence | null;
   /** Null when the decision is allow. */
   blast_radius?: BlastRadius | null;
   /** Set when the refusal is "we could not look", not "we found something". */

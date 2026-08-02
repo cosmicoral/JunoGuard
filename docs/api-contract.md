@@ -71,6 +71,22 @@ Lane A. Called before a package reaches disk.
       }
     }
   },
+  "sandbox": {
+    "status": "completed",
+    "engine": "docker",
+    "scripts_executed": [
+      { "lifecycle": "postinstall", "exit_code": 0, "timed_out": false }
+    ],
+    "files_created": ["cache.dat"],
+    "observations": [
+      "lifecycle script attempted network access; sandbox network was disabled"
+    ],
+    "isolation": {
+      "network": "none",
+      "root_filesystem": "read_only",
+      "capabilities": "none"
+    }
+  },
   "blast_radius": {
     "credentials_in_scope": ["OPENAI_API_KEY", "SUPABASE_SERVICE_ROLE_KEY"],
     "network_egress": "unrestricted",
@@ -86,6 +102,15 @@ In live Ossprey mode, JunoGuard independently resolves the exact package
 coordinate from the npm registry or PyPI and generates a CycloneDX 1.6 SBOM.
 A clean malware verdict does not proceed if that registry identity cannot be
 documented. `sbom` is null in deterministic offline fixture mode.
+
+When `SANDBOX_ENABLED=true`, every non-clean npm verdict is detonated before a
+proceedable flag is returned. The gateway downloads the registry tarball,
+verifies its published digest, and mounts only that artifact into the
+resource-bounded worker. Network, Linux capabilities, writable root storage,
+gateway credentials, and project files are absent. Concerning observations,
+timeouts, and worker failures promote an otherwise proceedable flag to a block.
+The static Ossprey policy remains authoritative when it already requires a
+block. `sandbox` is null for clean packages and while the feature is disabled.
 
 **Scanner unavailable.** `severity: "unknown"` means nobody has established a
 reputation for the package. `severity: "unavailable"` with `available: false`
@@ -366,7 +391,8 @@ es.addEventListener("expired",  () => reconnectWithFreshToken())
   "status": "ok",
   "service": "JunoGuard",
   "mode": "live",
-  "sbom": "registry"
+  "sbom": "registry",
+  "sandbox": "docker"
 }
 ```
 
