@@ -76,7 +76,7 @@ export function Stats({
   const budgetRatio = policy.daily_budget_usd > 0 ? spendToday / policy.daily_budget_usd : 0;
   const spendTone: Tone = budgetRatio >= 1 ? "block" : budgetRatio > 0.75 ? "flag" : "allow";
   const healthLabel =
-    budgetRatio >= 1 ? "cap reached" : budgetRatio > 0.75 ? "budget watch" : "gate healthy";
+    budgetRatio >= 1 ? "cap reached" : budgetRatio > 0.75 ? "budget watch" : "within budget";
 
   const blocks = actions.filter((a) => a.decision === "block");
   const packageBlocks = blocks.filter((a) => a.action_type === "package_install").length;

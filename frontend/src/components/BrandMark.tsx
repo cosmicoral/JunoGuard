@@ -63,12 +63,10 @@ export function BrandLockup({ className, size = 28, suspended }: BrandProps) {
       <span
         aria-hidden="true"
         style={{
-          // Sans, not mono. The board sets the wordmark in Söhne; Inter is the
-          // licensed stand-in it already names for body and UI.
           fontFamily: "var(--sans)",
           fontSize: wordmarkSize,
-          fontWeight: 700,
-          letterSpacing: "0.18em",
+          fontWeight: 600,
+          letterSpacing: "0.12em",
           lineHeight: 1,
         }}
       >

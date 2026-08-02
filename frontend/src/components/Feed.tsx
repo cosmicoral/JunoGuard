@@ -5,20 +5,19 @@ import type { DataSource } from "../lib/supabase";
 import type { AgentAction, Decision } from "../lib/types";
 
 const SOURCE_LABEL: Record<DataSource, string> = {
-  supabase: "SUPABASE REALTIME",
-  sse: "SSE · GATEWAY",
-  mock: "MOCK",
+  supabase: "Realtime",
+  sse: "SSE · gateway",
+  mock: "Mock",
 };
 
 /** Rendering the whole in-memory buffer costs layout work we do not need. */
 const VISIBLE_ROWS = 60;
 
-const BLOCK_RESTING = "rgba(248, 81, 73, 0.055)";
-const BLOCK_FLASH = "rgba(248, 81, 73, 0.28)";
+const BLOCK_RESTING = "rgba(248, 81, 73, 0.04)";
+const BLOCK_FLASH = "rgba(248, 81, 73, 0.12)";
 const TRANSPARENT = "rgba(248, 81, 73, 0)";
 
-const GLYPH: Record<Decision, string> = { allow: "✓", flag: "!", block: "✕" };
-const LABEL: Record<Decision, string> = { allow: "allow", flag: "FLAGGED", block: "BLOCKED" };
+const LABEL: Record<Decision, string> = { allow: "ALLOW", flag: "FLAG", block: "BLOCK" };
 
 /**
  * "BLOCKED" on its own leaves the room asking why. Two words of cause, pulled
@@ -46,7 +45,7 @@ function InstallEvidencePanel({ action }: { action: AgentAction }) {
 
       {sbom && (
         <section className="install-evidence-section" aria-label="CycloneDX SBOM">
-          <div className="install-evidence-title">CycloneDX SBOM</div>
+          <div className="install-evidence-title">SBOM</div>
           <div className="blast-grid">
             <div className="blast-key">Component</div>
             <div className="blast-val">
@@ -62,7 +61,7 @@ function InstallEvidencePanel({ action }: { action: AgentAction }) {
 
       {sandbox && (
         <section className="install-evidence-section" aria-label="Sandbox detonation">
-          <div className="install-evidence-title">Sandbox detonation</div>
+          <div className="install-evidence-title">Sandbox</div>
           <div className="blast-grid">
             <div className="blast-key">Result</div>
             <div className="blast-val" data-sandbox-status={sandbox.status}>
@@ -91,7 +90,7 @@ function InstallEvidencePanel({ action }: { action: AgentAction }) {
 
       {blast && (
         <section className="install-evidence-section" aria-label="Estimated blast radius">
-          <div className="install-evidence-title">Estimated blast radius</div>
+          <div className="install-evidence-title">Blast radius</div>
           <div className="blast-grid">
             <div className="blast-key">Credentials in scope</div>
             <div className="blast-val">
@@ -119,7 +118,7 @@ function InstallEvidencePanel({ action }: { action: AgentAction }) {
               </>
             )}
           </div>
-          <div className="blast-summary">Estimated blast radius — {blast.summary}</div>
+          <div className="blast-summary">{blast.summary}</div>
         </section>
       )}
 
@@ -193,9 +192,6 @@ function Row({
         }
       >
         <span className="cell-time">{clockTime(action.created_at)}</span>
-        <span className="cell-glyph" data-tone={action.decision}>
-          {GLYPH[action.decision]}
-        </span>
         <span className="cell-lane">
           {action.action_type === "package_install" ? "pkg" : "llm"}
         </span>
@@ -263,9 +259,9 @@ export function Feed({
   return (
     <section className="panel feed">
       <div className="feed-head">
-        <span className="feed-title">Live</span>
+        <span className="feed-title">Decision feed</span>
         <span className="feed-mode">{SOURCE_LABEL[source]}</span>
-        <span className="feed-count">both lanes · newest first</span>
+        <span className="feed-count">Allow · Flag · Block · newest first</span>
       </div>
       <ul className="feed-list">
         {rows.map((action) => {

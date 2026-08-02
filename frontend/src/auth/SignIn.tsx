@@ -67,9 +67,9 @@ export function SignIn() {
           <BrandMark className="auth-mark" size={25} />
           JUNOGUARD
         </a>
-        <p className="auth-kicker">CONTROL PLANE ACCESS</p>
-        <h1>Sign in to your JunoGuard console.</h1>
-        <p>Authenticate with Google or GitHub to inspect live decisions and manage the gate.</p>
+        <p className="auth-kicker">Console access</p>
+        <h1>Sign in to JunoGuard</h1>
+        <p>Use Google or GitHub to review Allow / Flag / Block decisions and enforce policy.</p>
 
         <div className="auth-provider-list">
           <button

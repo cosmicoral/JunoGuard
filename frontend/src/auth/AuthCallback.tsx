@@ -56,17 +56,17 @@ export function AuthCallback() {
         </a>
         {error ? (
           <>
-            <p className="auth-kicker">AUTHENTICATION FAILED</p>
-            <h1>Sign-in could not be completed.</h1>
+            <p className="auth-kicker">Sign-in failed</p>
+            <h1>Could not complete authentication</h1>
             <p className="auth-error" role="alert">{error}</p>
             <a className="auth-retry" href="/auth/sign-in">Return to sign in</a>
           </>
         ) : (
           <>
             <div className="auth-spinner" aria-hidden="true" />
-            <p className="auth-kicker">SECURE SESSION</p>
+            <p className="auth-kicker">Session</p>
             <h1>Completing sign-in…</h1>
-            <p>JunoGuard is exchanging the provider authorization for your Supabase session.</p>
+            <p>Exchanging the provider authorization for your console session.</p>
           </>
         )}
       </section>

@@ -49,12 +49,12 @@ export function ActivityChart({
     <section className="panel activity-card" aria-labelledby="activity-title">
       <div className="activity-head">
         <div>
-          <p className="section-kicker">Threat activity</p>
-          <h2 id="activity-title">Live gate pressure</h2>
+          <p className="section-kicker">Rate policy</p>
+          <h2 id="activity-title">Requests per minute</h2>
         </div>
         <div className="activity-reading">
           <strong>{count(reqPerMin)}</strong>
-          <span>req / min now</span>
+          <span>current / min</span>
         </div>
       </div>
 
@@ -76,7 +76,7 @@ export function ActivityChart({
           <line className="chart-grid chart-grid-muted" x1={PAD_X} y1={PAD_TOP + plotHeight / 2} x2={WIDTH - PAD_X} y2={PAD_TOP + plotHeight / 2} />
           <line className="chart-limit" x1={PAD_X} y1={limitY} x2={WIDTH - PAD_X} y2={limitY} />
           <text className="chart-limit-label" x={WIDTH - PAD_X} y={Math.max(limitY - 8, 14)}>
-            CAP {count(limit)}
+            LIMIT {count(limit)}
           </text>
           <polyline className="chart-line chart-line-secondary" points={secondaryPoints} />
           <polyline className="chart-line chart-line-primary" points={primaryPoints} />
@@ -84,15 +84,15 @@ export function ActivityChart({
             className="chart-terminal"
             cx={WIDTH - PAD_X}
             cy={PAD_TOP + (1 - latest / peak) * plotHeight}
-            r="5.5"
+            r="3.5"
           />
         </svg>
       </div>
 
       <div className="activity-legend" aria-hidden="true">
-        <span><i data-tone="primary" />Live rate</span>
-        <span><i data-tone="secondary" />Smoothed rate</span>
-        <span><i data-tone="limit" />Gateway cap</span>
+        <span><i data-tone="primary" />Live</span>
+        <span><i data-tone="secondary" />Smoothed</span>
+        <span><i data-tone="limit" />Policy limit</span>
       </div>
     </section>
   );

@@ -4,9 +4,9 @@ export type DashboardSection = "overview" | "feed" | "incidents" | "controls";
 
 const NAV_ITEMS: { id: DashboardSection; label: string }[] = [
   { id: "overview", label: "Overview" },
-  { id: "feed", label: "Live Feed" },
+  { id: "feed", label: "Decision feed" },
   { id: "incidents", label: "Incidents" },
-  { id: "controls", label: "Controls" },
+  { id: "controls", label: "Enforcement" },
 ];
 
 export const PRODUCT_LINKS = [
@@ -61,7 +61,7 @@ export function Sidebar({
       </div>
 
       <a className="sidebar-guide-cta" href="/#how">
-        How JunoGuard works <span aria-hidden="true">→</span>
+        How it works <span aria-hidden="true">→</span>
       </a>
 
       <nav className="sidebar-nav" aria-label="Dashboard sections">
@@ -107,7 +107,7 @@ export function Sidebar({
           disabled={!canControl}
           title={controlTitle}
         >
-          {suspended ? "RESET" : "SUSPEND"}
+          {suspended ? "Reset project" : "Suspend project"}
         </button>
 
         <div className="sidebar-account" title={`${userName} · ${userEmail}`}>
@@ -125,7 +125,7 @@ export function Sidebar({
         </div>
 
         <button className="sign-out" type="button" onClick={onSignOut} disabled={signingOut}>
-          {signingOut ? "SIGNING OUT..." : "SIGN OUT"}
+          {signingOut ? "Signing out…" : "Sign out"}
         </button>
       </div>
     </aside>
