@@ -351,6 +351,26 @@ def test_install_uses_client_declared_agent_scope(
     assert radius["scope_source"] == "client_declared"
 
 
+def test_install_rejects_unbounded_or_value_bearing_scope_names(
+    client: TestClient,
+    agent_headers: dict[str, str],
+) -> None:
+    response = client.post(
+        "/v1/guard/install",
+        headers=agent_headers,
+        json={
+            "package": "example",
+            "agent_scope": {
+                "credential_names": ["OPENAI_API_KEY=secret-value"],
+                "workspace_access": "read_write",
+                "repository": True,
+            },
+        },
+    )
+
+    assert response.status_code == 422
+
+
 # --- Charged flags count toward spend (JG-003) ------------------------------
 
 

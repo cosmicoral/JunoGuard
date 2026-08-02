@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import Any, AsyncIterator, Literal
+from typing import Annotated, Any, AsyncIterator, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -112,10 +112,16 @@ def controlled_project(
 # --- schemas ----------------------------------------------------------------
 
 
+CredentialName = Annotated[
+    str,
+    Field(min_length=1, max_length=128, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$"),
+]
+
+
 class AgentScope(BaseModel):
     """Names and capabilities declared by the calling agent; never secret values."""
 
-    credential_names: list[str] = Field(default_factory=list, max_length=200)
+    credential_names: list[CredentialName] = Field(default_factory=list, max_length=200)
     workspace_access: Literal["read_only", "read_write", "unknown"] = "unknown"
     repository: bool | None = None
 
