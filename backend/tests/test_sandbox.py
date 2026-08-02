@@ -23,6 +23,7 @@ def npm_artifact(url: str, payload: bytes) -> sandbox.Artifact:
         digest_algorithm="sha512",
         digest=hashlib.sha512(payload).digest(),
         suffix=".tgz",
+        filename="package.tgz",
     )
 
 

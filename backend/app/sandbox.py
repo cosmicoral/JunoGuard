@@ -41,6 +41,7 @@ class Artifact:
     digest_algorithm: str
     digest: bytes
     suffix: str
+    filename: str
 
 
 @dataclass(frozen=True)
@@ -78,6 +79,7 @@ def _npm_metadata(package: str, version: str | None) -> Artifact:
         digest_algorithm=algorithm,
         digest=digest,
         suffix=".tgz",
+        filename="package.tgz",
     )
 
 
@@ -126,6 +128,9 @@ def _pypi_metadata(package: str, version: str | None) -> Artifact:
     sha256 = str(digests.get("sha256") or "").lower()
     if (
         not artifact_url
+        or not filename
+        or Path(filename).name != filename
+        or any(not (char.isalnum() or char in "._+-") for char in filename)
         or len(sha256) != 64
         or any(char not in "0123456789abcdef" for char in sha256)
     ):
@@ -139,6 +144,7 @@ def _pypi_metadata(package: str, version: str | None) -> Artifact:
         digest_algorithm="sha256",
         digest=bytes.fromhex(sha256),
         suffix=".tar.gz" if filename.endswith(".tar.gz") else Path(filename).suffix,
+        filename=filename,
     )
 
 
@@ -225,7 +231,11 @@ def _docker_command(name: str, artifact: PreparedArtifact) -> list[str]:
         destination = "/input/package.tgz"
         image = config.SANDBOX_IMAGE
     else:
-        destination = f"/input/package{artifact.descriptor.suffix}"
+        destination = (
+            f"/input/{artifact.descriptor.filename}"
+            if artifact.descriptor.kind == "pypi-wheel"
+            else f"/input/package{artifact.descriptor.suffix}"
+        )
         image = config.SANDBOX_PYPI_IMAGE
     return [
         config.SANDBOX_DOCKER_BIN,
@@ -306,8 +316,6 @@ def detonate(package: str, ecosystem: str, version: str | None = None) -> dict[s
 
     with tempfile.TemporaryDirectory(prefix="junoguard-sandbox-") as directory:
         prepared = _download(package, ecosystem, version, Path(directory))
-        if prepared.descriptor.ecosystem == "pypi":
-            raise SandboxError("PyPI sandbox worker is not installed yet")
         result = _run(prepared)
 
     return {

@@ -1,0 +1,9 @@
+[build-system]
+requires = ["setuptools>=80", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "junoguard-pypi-canary"
+version = "1.0.0"
+description = "Harmless sandbox boundary canary"
+requires-python = ">=3.12"
