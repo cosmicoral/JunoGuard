@@ -123,6 +123,81 @@ def test_live_clean_install_blocks_when_sbom_generation_fails(
     assert response.json()["sbom"] is None
 
 
+# --- Suspicious npm packages detonate before proceeding --------------------
+
+
+def test_sandbox_evidence_promotes_suspicious_flag_to_block(
+    client: TestClient,
+    agent_headers: dict[str, str],
+    memory_store: MemoryStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "USE_OSSPREY", True)
+    monkeypatch.setattr(config, "SANDBOX_ENABLED", True)
+    memory_store.policy["block_severity"] = "malicious"
+    monkeypatch.setattr(
+        "app.risk.ossprey.scan",
+        lambda *a, **k: {
+            "available": True,
+            "severity": "suspicious",
+            "findings": ["install script present"],
+            "source": "ossprey",
+            "version": "1.0.0",
+        },
+    )
+    monkeypatch.setattr("app.risk.sbom.generate", lambda *a, **k: {"bomFormat": "CycloneDX"})
+    evidence = {
+        "status": "completed",
+        "scripts_executed": [{"lifecycle": "postinstall", "exit_code": 0}],
+        "observations": ["lifecycle script attempted network access; sandbox network was disabled"],
+    }
+    detonator = MagicMock(return_value=evidence)
+    monkeypatch.setattr("app.risk.sandbox.detonate", detonator)
+
+    response = _install(client, agent_headers)
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "block"
+    assert response.json()["sandbox"] == evidence
+    detonator.assert_called_once_with("left-pad", "npm", "1.0.0")
+
+
+def test_sandbox_clearance_preserves_policy_flag(
+    client: TestClient,
+    agent_headers: dict[str, str],
+    memory_store: MemoryStore,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(config, "USE_OSSPREY", True)
+    monkeypatch.setattr(config, "SANDBOX_ENABLED", True)
+    memory_store.policy["block_severity"] = "malicious"
+    monkeypatch.setattr(
+        "app.risk.ossprey.scan",
+        lambda *a, **k: {
+            "available": True,
+            "severity": "suspicious",
+            "findings": ["new package"],
+            "source": "ossprey",
+            "version": "1.0.0",
+        },
+    )
+    monkeypatch.setattr("app.risk.sbom.generate", lambda *a, **k: {"bomFormat": "CycloneDX"})
+    monkeypatch.setattr(
+        "app.risk.sandbox.detonate",
+        lambda *a, **k: {
+            "status": "completed",
+            "scripts_executed": [],
+            "observations": [],
+        },
+    )
+
+    response = _install(client, agent_headers)
+
+    assert response.status_code == 200
+    assert response.json()["decision"] == "flag"
+    assert response.json()["sandbox"]["status"] == "completed"
+
+
 # --- Charged flags count toward spend (JG-003) ------------------------------
 
 

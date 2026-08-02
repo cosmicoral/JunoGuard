@@ -265,6 +265,7 @@ def health() -> dict[str, Any]:
         "store": "supabase" if isinstance(store, store_module.SupabaseStore) else "memory",
         "scanner": "ossprey" if config.USE_OSSPREY else "mock",
         "sbom": "registry" if config.USE_OSSPREY else "disabled_in_mock_mode",
+        "sandbox": "docker" if config.SANDBOX_ENABLED else "disabled",
         "provider": "mock" if config.MOCK_PROVIDER or not config.PROVIDER_API_KEY else "live",
     }
 
@@ -333,6 +334,7 @@ def guard_install(
     body = _envelope(action_id, verdict, status) | {
         "verdict": verdict.metadata.get("verdict"),
         "sbom": verdict.metadata.get("sbom"),
+        "sandbox": verdict.metadata.get("sandbox"),
         "blast_radius": verdict.metadata.get("blast_radius"),
     }
 

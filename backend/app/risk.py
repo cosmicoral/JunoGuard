@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from . import blast, config, ossprey, pricing, sbom
+from . import blast, config, ossprey, pricing, sandbox, sbom
 
 Decision = Literal["allow", "flag", "block"]
 Risk = Literal["low", "medium", "high", "critical"]
@@ -112,18 +112,59 @@ def evaluate_install(
             decision="allow",
             reason=f"{package} cleared by Ossprey.",
             risk_level="low",
-            metadata={"verdict": verdict, "sbom": document, "blast_radius": None},
+            metadata={
+                "verdict": verdict,
+                "sbom": document,
+                "sandbox": None,
+                "blast_radius": None,
+            },
         )
 
     radius = blast.compute(package, findings)
+    sandbox_result: dict[str, Any] | None = None
+    sandbox_error: str | None = None
+    if config.SANDBOX_ENABLED and ecosystem == "npm":
+        try:
+            sandbox_result = sandbox.detonate(
+                package, ecosystem, verdict.get("version") or version
+            )
+        except sandbox.SandboxError as exc:
+            sandbox_error = str(exc)
+
     metadata = {
         "verdict": verdict,
         "sbom": document,
+        "sandbox": sandbox_result,
         "blast_radius": radius,
         **({"sbom_error": sbom_error} if sbom_error else {}),
+        **({"sandbox_error": sandbox_error} if sandbox_error else {}),
     }
 
-    if ossprey.at_least(severity, policy["block_severity"]):
+    scanner_blocks = ossprey.at_least(severity, policy["block_severity"])
+    if config.SANDBOX_ENABLED and ecosystem == "npm" and not scanner_blocks:
+        observations = list((sandbox_result or {}).get("observations") or [])
+        sandbox_status = (sandbox_result or {}).get("status")
+        if sandbox_error or sandbox_status != "completed" or observations:
+            detail = sandbox_error or "; ".join(str(item) for item in observations[:3])
+            if not detail:
+                detail = f"sandbox status: {sandbox_status or 'unavailable'}"
+            return Verdict(
+                decision="block",
+                reason=(
+                    f"{package} was NOT installed. Its static verdict was {severity}, "
+                    f"and isolated lifecycle detonation did not clear it ({detail}). "
+                    f"Choose a different dependency or ask an operator to review the evidence."
+                ),
+                risk_level="high",
+                metadata=metadata,
+                incident={
+                    "severity": "high",
+                    "title": f"Sandbox blocked risky package behavior: {package}",
+                    "evidence": metadata,
+                },
+            )
+
+    if scanner_blocks:
         detail = findings[0] if findings else "flagged by Ossprey"
         return Verdict(
             decision="block",
