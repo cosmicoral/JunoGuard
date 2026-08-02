@@ -124,18 +124,20 @@ export function Dashboard() {
         />
 
         <main className="dashboard-main" data-suspended={juno.suspended}>
+          <nav className="dashboard-guide-links" aria-label="Product guide">
+            <strong>Product guide</strong>
+            {PRODUCT_LINKS.map((link) => (
+              <a href={link.href} key={link.href}>
+                {link.label}
+              </a>
+            ))}
+          </nav>
+
           <section ref={overviewRef} id="overview" className="dashboard-topbar">
             <div>
               <p className="section-kicker">JunoGuard</p>
               <h1>Overview</h1>
               <p>{juno.project.name}</p>
-              <nav className="dashboard-guide-links" aria-label="Product guide">
-                {PRODUCT_LINKS.map((link) => (
-                  <a href={link.href} key={link.href}>
-                    {link.label}
-                  </a>
-                ))}
-              </nav>
             </div>
             <div className="topbar-status" data-suspended={juno.suspended}>
               <span className="status" data-suspended={juno.suspended}>

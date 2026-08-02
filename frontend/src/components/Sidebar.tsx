@@ -60,6 +60,10 @@ export function Sidebar({
         </a>
       </div>
 
+      <a className="sidebar-guide-cta" href="/#how">
+        How JunoGuard works <span aria-hidden="true">→</span>
+      </a>
+
       <nav className="sidebar-nav" aria-label="Dashboard sections">
         <p className="sidebar-nav-label">Console</p>
         {NAV_ITEMS.map((item) => (
