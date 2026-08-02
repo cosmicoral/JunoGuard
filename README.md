@@ -174,6 +174,8 @@ Computed from the agent's actual scope. No LLM required.
 ### Oversight and response
 
 - Incident records with severity, evidence, and timeline
+- Expandable CycloneDX SBOM, sandbox observations, and blast-radius evidence in
+  the live install feed
 - **Kill switch** — suspend a project instantly; both lanes go dark; manual reset required
 - Live dashboard over Supabase Realtime
 - Spend and blocks in a single view
@@ -205,7 +207,7 @@ what is still an intention.
 | Token, per-request and daily budget caps | **live** | `risk.py`, atomic reserve in `store.py` |
 | Burst / rate limiting | **live** | `store.reserve`, SQL `reserve_action` |
 | Kill switch with operator roles and audit | **live** | `auth.py`, `control_events` |
-| Live dashboard, Supabase Realtime and SSE | **live** | `frontend/`, `POST /v1/events/token` |
+| Live dashboard, install evidence, Supabase Realtime and SSE | **live** | `frontend/`, `POST /v1/events/token` |
 | Ossprey verdicts without an API key | **mock** | `ossprey._mock_verdict` — deterministic fixtures |
 | Model provider calls without a key | **mock** | `provider.MOCK_ANSWER` |
 | Blast radius | **mock** | `backend/app/blast.py` — inferred from the local environment, not measured |

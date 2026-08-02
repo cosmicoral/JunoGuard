@@ -10,9 +10,37 @@ export interface BlastRadius {
   summary: string;
 }
 
+export interface CycloneDxSbom {
+  bomFormat: "CycloneDX";
+  specVersion: string;
+  serialNumber?: string;
+  metadata?: {
+    component?: {
+      name?: string;
+      version?: string;
+      purl?: string;
+    };
+  };
+}
+
+export interface SandboxEvidence {
+  status: "completed" | "timed_out" | "artifact_rejected";
+  engine?: "docker";
+  artifact_kind?: "npm-tarball" | "pypi-sdist" | "pypi-wheel";
+  scripts_executed?: Array<{
+    lifecycle: string;
+    exit_code?: number | null;
+    timed_out?: boolean;
+  }>;
+  files_created?: string[];
+  observations?: string[];
+}
+
 export interface ActionMetadata {
   blast_radius?: BlastRadius;
   ossprey?: { verdict: string; severity: string };
+  sbom?: CycloneDxSbom | null;
+  sandbox?: SandboxEvidence | null;
   [key: string]: unknown;
 }
 

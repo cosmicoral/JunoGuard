@@ -26,6 +26,8 @@ const needles = [
   "GATEWAY UNREACHABLE",
   "ENTER DEMO SIMULATION",
   "SIMULATION",
+  "CycloneDX SBOM",
+  "Sandbox detonation",
 ];
 
 const missing = needles.filter((needle) => !bundle.includes(needle));

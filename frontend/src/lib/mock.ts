@@ -117,6 +117,27 @@ export function maliciousPackage(at = Date.now()): AgentAction {
     risk_level: "critical",
     metadata: {
       ossprey: { verdict: "malicious", severity: "critical" },
+      sbom: {
+        bomFormat: "CycloneDX",
+        specVersion: "1.6",
+        metadata: {
+          component: {
+            name: "@ossprey/test-package",
+            version: "1.0.0",
+            purl: "pkg:npm/%40ossprey/test-package@1.0.0",
+          },
+        },
+      },
+      sandbox: {
+        status: "completed",
+        engine: "docker",
+        artifact_kind: "npm-tarball",
+        scripts_executed: [{ lifecycle: "postinstall", exit_code: 0 }],
+        files_created: ["cache.dat"],
+        observations: [
+          "lifecycle script attempted network access; sandbox network was disabled",
+        ],
+      },
       blast_radius: {
         credentials: ["OPENAI_API_KEY", "SUPABASE_SERVICE_ROLE_KEY", "AWS_PROFILE=prod"],
         network_egress: "unrestricted",
