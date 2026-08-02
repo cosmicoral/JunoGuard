@@ -93,6 +93,10 @@ export function SignIn() {
           </button>
         </div>
 
+        <a className="auth-skip" href="/">
+          Continue to the JunoGuard homepage
+        </a>
+
         {!isSupabaseConfigured && (
           <p className="auth-error" role="alert">
             Supabase is not configured. Add the frontend URL and anon key before signing in.

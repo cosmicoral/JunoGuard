@@ -44,7 +44,7 @@ export function Dashboard() {
     setAuthError(null);
     try {
       await signOut();
-      window.location.replace("/auth/sign-in");
+      window.location.replace("/");
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "Unable to sign out.");
       setSigningOut(false);

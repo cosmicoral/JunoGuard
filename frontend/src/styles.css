@@ -1750,6 +1750,7 @@ body[data-suspended="true"] {
 }
 
 .auth-nav a:focus-visible,
+.auth-skip:focus-visible,
 .auth-card-links a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 4px;
@@ -1859,6 +1860,27 @@ body[data-suspended="true"] {
 .oauth-sign-in:active:not(:disabled) { transform: scale(0.99); }
 .oauth-sign-in:focus-visible { outline: 3px solid var(--juno); outline-offset: 3px; }
 .oauth-sign-in:disabled { cursor: not-allowed; opacity: 0.58; }
+
+.auth-skip {
+  margin-top: 14px;
+  padding: 11px 14px;
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-align: center;
+  text-decoration: none;
+  transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
+}
+
+.auth-skip:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  color: var(--accent);
+}
 
 .auth-error {
   margin: 18px 0 0;
