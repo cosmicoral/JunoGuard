@@ -93,11 +93,11 @@ function DecisionConsole() {
 }
 
 export function Landing() {
-  const { loading, session } = useAuth();
+  const { session } = useAuth();
   const reduce = useReducedMotion() ?? false;
   const reveal = reduce ? {} : { initial: { opacity: 0, y: 18 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: 0.2 }, transition: { duration: 0.55, ease: [0.23, 1, 0.32, 1] as const } };
   const consoleHref = session ? "/dashboard" : "/auth/sign-in";
-  const consoleLabel = loading ? "Console" : session ? "Open console" : "Sign in";
+  const consoleLabel = session ? "Open live console" : "Live console · sign in";
 
   return (
     <main className="landing-shell">
@@ -132,7 +132,7 @@ export function Landing() {
           </p>
           <div className="hero-actions">
             <a className="primary-action" href={consoleHref}>
-              {session ? "Open live console" : "Sign in to console"} <span>→</span>
+              {consoleLabel} <span>→</span>
             </a>
             <a className="text-action" href="#how">
               See the gate in action
@@ -276,7 +276,7 @@ export function Landing() {
         <p className="section-index">READY / 05</p>
         <h2>Give your agent<br />a line it cannot cross.</h2>
         <div>
-          <a className="primary-action" href={consoleHref}>{session ? "Launch the live console" : "Sign in to the console"} <span>→</span></a>
+          <a className="primary-action" href={consoleHref}>{consoleLabel} <span>→</span></a>
           <a className="text-action" href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">Read the source on GitHub ↗</a>
         </div>
       </section>
