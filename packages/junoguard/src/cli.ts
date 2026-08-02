@@ -34,6 +34,12 @@ import {
   type Style,
 } from "./render.js";
 import type { Ecosystem, StatusResult } from "./types.js";
+import {
+  disableWrap,
+  enableWrap,
+  resolveRealBinary,
+  wrapStatus,
+} from "./wrap.js";
 
 // 0 clean · 2 blocked by policy · 3 guard unreachable. Distinct so CI can tell
 // "Juno said no" from "Juno was down", which are different problems.
@@ -295,15 +301,70 @@ async function cmdForward(
 }
 
 function exec(cmd: string[], manager: string): Promise<number> {
-  say(`$ ${cmd.join(" ")}`, "dim");
+  const real = resolveRealBinary(cmd[0] ?? manager);
+  const argv = [real, ...cmd.slice(1)];
+  say(`$ ${argv.join(" ")}`, "dim");
   return new Promise((resolve) => {
-    const child = spawn(cmd[0]!, cmd.slice(1), { stdio: "inherit", shell: false });
+    const child = spawn(argv[0]!, argv.slice(1), { stdio: "inherit", shell: false });
     child.on("error", () => {
       say(`${manager} is not on PATH`, "block");
       resolve(EXIT_UNAVAILABLE);
     });
     child.on("close", (code) => resolve(code ?? 0));
   });
+}
+
+function cmdWrap(argv: string[]): number {
+  const [sub] = argv;
+  if (!sub || sub === "status" || sub === "-h" || sub === "--help") {
+    if (sub === "-h" || sub === "--help") {
+      say("usage: juno wrap on|off|status", "flag");
+      return sub ? EXIT_OK : 1;
+    }
+    const status = wrapStatus();
+    if (!status.active.length) {
+      say("PATH wrap is off. Run: juno wrap on", "flag");
+      return EXIT_OK;
+    }
+    say(`PATH wrap active in ${status.dir}`, "allow");
+    say(`shims: ${status.active.join(", ")}`, "dim");
+    if (status.pathPrefixed) {
+      say("this directory is already first on PATH", "dim");
+    } else {
+      say("put the wrap directory first on PATH:", "flag");
+      say(`  export PATH="${status.dir}:$PATH"`, "key");
+    }
+    say(
+      "residual: absolute paths to the real package manager still bypass the wrap",
+      "dim",
+    );
+    return EXIT_OK;
+  }
+
+  if (sub === "on") {
+    const { dir, created } = enableWrap();
+    say(`wrote ${created.length} shims in ${dir}`, "allow");
+    say("put the wrap directory first on PATH for this shell:", "flag");
+    say(`  export PATH="${dir}:$PATH"`, "key");
+    say(
+      "bare npm/pnpm/yarn/pip install now routes through JunoGuard. Absolute paths still bypass.",
+      "dim",
+    );
+    return EXIT_OK;
+  }
+
+  if (sub === "off") {
+    const { dir, removed } = disableWrap();
+    if (!removed.length) {
+      say(`PATH wrap already off (${dir})`, "dim");
+      return EXIT_OK;
+    }
+    say(`removed ${removed.length} shims from ${dir}`, "allow");
+    return EXIT_OK;
+  }
+
+  say(`unknown wrap command "${sub}" — use on, off, or status`, "block");
+  return 1;
 }
 
 async function cmdWatch(argv: string[]): Promise<number> {
@@ -490,9 +551,16 @@ ${pc.bold("COMMANDS")}
   pnpm install <pkg>...     scan, then run the real pnpm if all are clean
   yarn add <pkg>...         scan, then run the real yarn if all are clean
   pip install <pkg>...      scan, then run the real pip if all are clean
+  wrap on|off|status        project PATH shims so bare installs hit the gate
   watch                     tail the live decision feed
   init [agent]...           wire junoguard into an AI coding agent
   mcp                       run the MCP server over stdio
+
+${pc.bold("WRAP")}
+  juno wrap on              write .junoguard/bin shims for npm, pnpm, yarn, pip
+  juno wrap off             remove those shims
+  juno wrap status          show whether PATH includes the wrap directory
+  Absolute paths to the real package manager still bypass the wrap.
 
 ${pc.bold("INIT")}
   juno init                 detect installed agents, configure each
@@ -562,6 +630,9 @@ export async function main(
 
     case "init":
       return cmdInit(rest, packageName);
+
+    case "wrap":
+      return cmdWrap(rest);
 
     case "mcp": {
       // Imported lazily so the CLI path never pays for the MCP SDK.

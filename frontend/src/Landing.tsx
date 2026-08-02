@@ -197,7 +197,7 @@ export function Landing() {
             <div>
               <p className="card-label">SUPPLY CHAIN</p>
               <h3>Stop the package before it reaches disk.</h3>
-              <p>Every install is intercepted over MCP, scanned for known risk, and refused with a structured reason the agent can understand.</p>
+              <p>Installs that go through the MCP tool or `juno` CLI/PATH wrap are scanned for known risk and refused with a structured reason the agent can understand.</p>
             </div>
             <ul>
               <li><span>01</span> Pre-install interception</li>
@@ -249,7 +249,8 @@ export function Landing() {
           <h2>One command.<br />Every agent you use.</h2>
           <p className="install-lede">
             JunoGuard ships as an MCP server and a CLI in one package. Point your
-            agent at it once and every install it attempts is checked first.
+            agent at it, and optionally enable `juno wrap`, so installs that go
+            through the guard are checked first.
           </p>
           <a className="text-action" href={NPM_URL} target="_blank" rel="noreferrer">
             {PACKAGE} on npm ↗
@@ -274,7 +275,7 @@ export function Landing() {
 
       <section className="final-cta">
         <p className="section-index">READY / 05</p>
-        <h2>Give your agent<br />a line it cannot cross.</h2>
+        <h2>Give your agent<br />a gate before the blast radius.</h2>
         <div>
           <a className="primary-action" href={consoleHref}>{consoleLabel} <span>→</span></a>
           <a className="text-action" href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">Read the source on GitHub ↗</a>

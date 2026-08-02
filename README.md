@@ -127,9 +127,11 @@ the gateway process. See
 Every package the agent tries to install is intercepted **before** it reaches disk.
 
 - Pre-install interception over MCP — **advisory**: it depends on the agent
-  calling the tool. An OS or package-manager boundary that an agent genuinely
-  cannot step around is not implemented. `juno npm install` closes the gap for
-  installs that go through it.
+  calling the tool. `juno npm|pnpm|yarn|pip …` closes the gap for installs that
+  go through the CLI. `juno wrap on` adds project-local PATH shims so bare
+  package-manager invocations hit the same gate; absolute paths to the real
+  binary still bypass. A kernel or package-manager hook that an agent genuinely
+  cannot step around is not implemented.
 - [Ossprey](https://ossprey.com) malware verdict
 - Registry-backed CycloneDX 1.6 SBOM for the exact package coordinate
 - Optional Docker detonation of non-clean npm lifecycle scripts and PyPI
@@ -217,7 +219,8 @@ what is still an intention.
 | Agent-scoped blast radius | **live (client-declared)** | Clients report names-only local scope; `backend/app/blast.py` enriches it with scanner and sandbox evidence |
 | Registry-backed CycloneDX SBOM generation | **live** | `backend/app/sbom.py`; runs for mock and Ossprey verdicts, fail-closed on clean installs when the registry cannot identify the package |
 | Sandbox detonation of non-clean npm and PyPI packages | **live (opt-in)** | `backend/app/sandbox.py`, hardened images in `sandbox/` |
-| Interception an agent cannot bypass | **planned** | MCP is advisory (see Lane A); no OS or package-manager boundary |
+| PATH wrap for bare package-manager installs | **live (opt-in)** | `juno wrap on` → `.junoguard/bin` shims; absolute paths still bypass |
+| Kernel / package-manager hook an agent cannot bypass | **planned** | MCP remains advisory without an OS boundary |
 
 `GET /health` reports `mode: mock` whenever the Ossprey or provider credentials
 are absent, so the running system says which of these it is.

@@ -31,9 +31,10 @@ checked first.
 > **MCP enforcement is advisory.** It works by the agent choosing to call the
 > tool. Nothing at the OS or package-manager level stops an agent that shells out
 > to `npm install` directly, and this package does not claim otherwise. Use
-> `juno npm|pnpm|yarn install` / `juno pip install` in scripts and CI where you control the
-> command, and treat the MCP server as policy the agent is asked to respect
-> rather than a boundary it cannot cross.
+> `juno wrap on` (PATH shims) or `juno npm|pnpm|yarn install` / `juno pip install`
+> in scripts and CI where you control the command. Absolute paths to the real
+> package manager still bypass the wrap. Treat the MCP server as policy the
+> agent is asked to respect rather than a boundary it cannot cross.
 >
 > Where Juno *is* consulted it fails closed: an unreachable gateway, an
 > unavailable scanner, or a source that cannot be scanned at all all end with the
@@ -153,6 +154,7 @@ juno npm install react zod     # scan, then run the real npm
 juno pnpm add react zod        # scan, then run the real pnpm
 juno yarn add react zod        # scan, then run the real yarn
 juno pip install requests      # scan, then run the real pip
+juno wrap on                   # PATH shims so bare installs hit the gate
 juno watch                     # tail the live decision feed
 ```
 

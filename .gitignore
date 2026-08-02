@@ -12,6 +12,9 @@ __pycache__/
 node_modules/
 dist/
 
+# Local PATH wraps written by `juno wrap on`
+.junoguard/
+
 # Supabase CLI local link state (project ref, pooler URL, service versions)
 supabase/.temp/
 
