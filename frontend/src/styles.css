@@ -12,6 +12,12 @@
   --text: #e8ecf1;
   --muted: #8b949e;
 
+  /* Brand Emerald from the JunoGuard board. Held separately from --accent so
+     the identity survives changes to the dashboard's semantic palette: --accent
+     and --allow are decision colours and belong to the console, this one
+     belongs to the logo. BrandMark reads this and nothing else. */
+  --brand-emerald: #00c16a;
+
   --accent: #3fb950;
   --allow: #3fb950;
   --block: #f85149;
@@ -2209,6 +2215,13 @@ body[data-suspended="true"] {
   --landing-bg: #0b1220; /* Deep Navy */
   --landing-panel: #17202e; /* Graphite */
   --landing-ink: #f8fafc; /* Off White */
+  /* Inter, per the board's type spec. Scoped to this subtree rather than set
+     globally, because the console deliberately runs on IBM Plex Sans — this
+     overrides for the landing only and leaves that alone. Söhne is the board's
+     display face but is commercially licensed and not available here. */
+  --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: "Inter", ui-sans-serif, system-ui, sans-serif;
+
   --landing-slate: #6474bb; /* Slate — chrome and dividers, per the board */
   /* Board Slate fails contrast as body copy on Deep Navy, so secondary text
      uses a lighter step off the same hue. Slate stays available above. */

@@ -20,7 +20,9 @@ function ringTone(suspended: boolean | undefined) {
 }
 
 function dotTone(suspended: boolean | undefined) {
-  return suspended ? "var(--block, #f85149)" : "var(--accent, #00C16A)";
+  // --brand-emerald, not --accent. The dashboard's accent is a decision colour
+  // and has already been retuned once; the logo must not move with it.
+  return suspended ? "var(--block, #f85149)" : "var(--brand-emerald, #00c16a)";
 }
 
 export function BrandMark({ className, size = 32, suspended }: BrandProps) {
