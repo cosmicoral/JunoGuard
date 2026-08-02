@@ -159,6 +159,16 @@ class MemoryStore:
                     action.update(fields)
                     return
 
+    def get_action(self, action_id: str) -> dict[str, Any] | None:
+        return next((a for a in self.actions if a["id"] == action_id), None)
+
+    def update_incident_for_action(self, action_id: str, fields: dict[str, Any]) -> None:
+        with self._lock:
+            for incident in self.incidents:
+                if incident.get("action_id") == action_id:
+                    incident.update(fields)
+                    return
+
     def daily_spend_usd(self, project_id: str) -> float:
         """Every charged action, whatever it was labelled.
 
@@ -388,6 +398,16 @@ class SupabaseStore:
     def update_action(self, action_id: str, fields: dict[str, Any]) -> None:
         r = self._client.patch(
             "/agent_actions", params={"id": f"eq.{action_id}"}, json=fields
+        )
+        r.raise_for_status()
+
+    def get_action(self, action_id: str) -> dict[str, Any] | None:
+        rows = self._get("/agent_actions", id=f"eq.{action_id}", select="*", limit=1)
+        return rows[0] if rows else None
+
+    def update_incident_for_action(self, action_id: str, fields: dict[str, Any]) -> None:
+        r = self._client.patch(
+            "/incidents", params={"action_id": f"eq.{action_id}"}, json=fields
         )
         r.raise_for_status()
 

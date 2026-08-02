@@ -101,6 +101,21 @@ STREAM_TOKEN_SECRET = os.getenv("STREAM_TOKEN_SECRET", "")
 
 OPERATOR_TOKEN = os.getenv("OPERATOR_TOKEN", "")
 
+# --- cold-path detonation ----------------------------------------------------
+# A Modal worker installs suspect packages in a disposable, network-blocked
+# sandbox and reports what they did. Entirely optional: unset means Lane A
+# behaves exactly as before, minus the evidence.
+
+MODAL_DETONATE_URL = os.getenv("MODAL_DETONATE_URL", "").rstrip("/")
+# Bearer we send to the worker.
+MODAL_DETONATE_TOKEN = os.getenv("MODAL_DETONATE_TOKEN", "")
+# Bearer the worker must send back. Without it, callbacks are refused — an
+# unauthenticated callback endpoint would let anyone write incident evidence.
+DETONATION_CALLBACK_TOKEN = os.getenv("DETONATION_CALLBACK_TOKEN", "")
+DETONATION_ENABLED = _bool("DETONATION_ENABLED", True)
+# Where the worker can reach this gateway to deliver its report.
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+
 # --- deployment -------------------------------------------------------------
 
 # "development" or "production". Production refuses to look ready while it is

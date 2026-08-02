@@ -1,0 +1,3 @@
+# Local tooling for deploying the detonation worker. The runtime image is
+# defined in detonate.py; Modal builds it, not pip.
+modal>=0.64

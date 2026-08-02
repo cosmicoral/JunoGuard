@@ -174,6 +174,38 @@ raises an incident so the gap in coverage appears in review.
 
 ---
 
+## `POST /v1/detonations/{action_id}`
+
+Callback for the Modal detonation worker (see [modal/](../modal)). Not for
+agents — it takes the worker's bearer token, never `X-Juno-Key`.
+
+```jsonc
+{
+  "report": {
+    "status": "ok",
+    "severity": "critical",           // none | low | medium | high | critical
+    "summary": "Install ran postinstall; exposed AWS_SECRET_ACCESS_KEY.",
+    "ran_lifecycle_scripts": ["postinstall"],
+    "attempted_egress": true,         // with egress blocked, an attempt is the signal
+    "canaries_exposed": ["AWS_SECRET_ACCESS_KEY"],
+    "unexpected_writes": ["/root/.ssh/authorized_keys"],
+    "exit_code": 0,
+    "duration_ms": 8412
+  }
+}
+```
+
+The report lands on the action's `metadata.detonation`, and on the linked
+incident's evidence. **It is treated as hostile input** — it was assembled in a
+container where a package's install script had just run — so it is
+bearer-authenticated, size-capped, stripped of control characters, and reduced
+to the fields above with pinned enumerations. Unknown keys are dropped and an
+unrecognised `severity` becomes `"unknown"`.
+
+Emits a `detonation` event on the live feed.
+
+---
+
 ## `POST /v1/guard/llm`
 
 Lane B. Proxied model call.

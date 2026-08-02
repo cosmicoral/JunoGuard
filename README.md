@@ -115,7 +115,16 @@ There is no AI on the hot path or in sandbox analysis. When the optional
 sandbox is enabled, non-clean npm and PyPI packages take a bounded,
 deterministic container detonation step before a proceedable flag is returned.
 The package code runs in an ecosystem-specific isolated worker image, never in
-the gateway process. See
+the gateway process.
+
+Two execution backends exist for that detonation, and they answer different
+questions. The **local Docker** worker (`sandbox/`) runs before the verdict is
+returned, so its evidence can turn a suspicious package into a block — but it
+needs a Docker daemon wherever the gateway runs. The **Modal** worker
+(`modal/`) runs after the response on the cold path, so it cannot prevent the
+install it reports on; what it buys is isolation off the gateway's own host, no
+Docker dependency, and evidence that can retroactively block a package that
+already proceeded. See
 [What is actually implemented](#what-is-actually-implemented).
 
 ---
@@ -220,7 +229,8 @@ what is still an intention.
 | Model provider calls without a key | **mock** | `provider.MOCK_ANSWER` |
 | Agent-scoped blast radius | **live (client-declared)** | Clients report names-only local scope; `backend/app/blast.py` enriches it with scanner and sandbox evidence |
 | Registry-backed CycloneDX SBOM generation | **live** | `backend/app/sbom.py`; runs for mock and Ossprey verdicts, fail-closed on clean installs when the registry cannot identify the package |
-| Sandbox detonation of non-clean npm and PyPI packages | **live (opt-in)** | `backend/app/sandbox.py`, hardened images in `sandbox/` |
+| Sandbox detonation of non-clean npm and PyPI packages, local Docker | **live (opt-in)** | `backend/app/sandbox.py`, hardened images in `sandbox/`; gates the verdict |
+| Sandbox detonation on Modal, cold path | **built, not deployed** | `modal/detonate.py` + `POST /v1/detonations/{id}`; evidence and retroactive response only, awaiting `modal deploy` |
 | PATH wrap for bare package-manager installs | **live (opt-in)** | `juno wrap on` → `.junoguard/bin` shims; absolute paths still bypass |
 | Cursor shell install gate | **live (opt-in via init)** | `beforeShellExecution` deny for ungated npm/pnpm/yarn/pip installs; `failClosed: true` |
 | Guarded JS installs default to `--ignore-scripts` | **live** | `juno npm|pnpm …` adds `--ignore-scripts` unless overridden |

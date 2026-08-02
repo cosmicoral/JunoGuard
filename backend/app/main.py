@@ -11,12 +11,12 @@ import json
 import time
 from typing import Annotated, Any, AsyncIterator, Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import auth, config, demo, events, pricing, provider, risk, tokens
+from . import auth, config, demo, detonation, events, pricing, provider, risk, tokens
 from . import store as store_module
 from .store import public_project, store
 
@@ -322,9 +322,38 @@ def ready(response: Response) -> dict[str, Any]:
     return {"status": "ready", "environment": config.JUNO_ENV}
 
 
+def _maybe_detonate(
+    background: BackgroundTasks,
+    project: dict[str, Any],
+    action_id: str,
+    verdict: risk.Verdict,
+    package: str,
+    ecosystem: str,
+    version: str | None,
+) -> None:
+    """Queue cold-path detonation, after the decision and after the response.
+
+    A background task rather than an inline call: the agent has already been
+    told what happens to its install, and nothing about that answer may depend
+    on a sandbox that takes two minutes.
+    """
+    if not detonation.should_detonate("package_install", verdict.decision, verdict.metadata):
+        return
+    background.add_task(
+        detonation.request_detonation,
+        action_id=action_id,
+        project_id=project["id"],
+        package=package,
+        ecosystem=ecosystem,
+        version=version,
+    )
+
+
 @app.post("/v1/guard/install")
 def guard_install(
-    payload: InstallRequest, project: dict[str, Any] = Depends(current_project)
+    payload: InstallRequest,
+    background: BackgroundTasks,
+    project: dict[str, Any] = Depends(current_project),
 ) -> dict[str, Any]:
     """Lane A. Called before a package reaches disk."""
     if project["status"] == "suspended":
@@ -343,6 +372,11 @@ def guard_install(
         verdict,
         action_type="package_install",
         target=payload.package,
+    )
+
+    _maybe_detonate(
+        background, project, action_id, verdict,
+        payload.package, payload.ecosystem, payload.version,
     )
 
     # Re-read: a malicious verdict may have just suspended the project.
@@ -390,6 +424,55 @@ def guard_unscanned(
     )
     status = "suspended" if project["status"] == "suspended" else "active"
     return _envelope(action_id, verdict, status)
+
+
+@app.post("/v1/detonations/{action_id}")
+async def detonation_report(
+    action_id: str, request: Request, authorization: str = Header(default="")
+) -> dict[str, Any]:
+    """Receive a sandbox report and attach it to the action it belongs to.
+
+    Everything about this endpoint assumes the caller is hostile. The report was
+    assembled in a container where a package's install script had just run, so
+    it is bearer-authenticated, size-capped, and reduced to known fields with
+    known types before it reaches the audit trail. A package that wants to write
+    its own incident evidence gets a truncated string in a fixed schema instead.
+    """
+    if not detonation.callback_authorized(authorization):
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "invalid_callback_token", "detail": "Not a known detonation worker."},
+        )
+
+    body = await request.json()
+    try:
+        report = detonation.validate_report(body.get("report"))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail={"error": "invalid_report", "detail": str(exc)}
+        ) from exc
+
+    action = store.get_action(action_id)
+    if not action:
+        raise HTTPException(
+            status_code=404, detail={"error": "unknown_action", "detail": "No such action."}
+        )
+
+    metadata = dict(action.get("metadata") or {})
+    metadata["detonation"] = report
+    store.update_action(action_id, {"metadata": metadata})
+
+    # An incident raised for this action gets the evidence too — that is where a
+    # reviewer looks, and inferred blast radius is exactly what this replaces.
+    if report.get("severity") in {"high", "critical"} or action.get("decision") != "allow":
+        store.update_incident_for_action(action_id, {"evidence": metadata})
+
+    events.publish(
+        "detonation",
+        action["project_id"],
+        {"action_id": action_id, **report},
+    )
+    return {"status": "recorded", "action_id": action_id, "severity": report.get("severity")}
 
 
 @app.post("/v1/guard/llm")
