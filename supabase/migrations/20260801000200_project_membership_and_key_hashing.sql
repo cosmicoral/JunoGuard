@@ -7,6 +7,11 @@
 
 create extension if not exists "pgcrypto";
 
+-- Hosted Supabase installs pgcrypto into `extensions`; a stock Postgres puts it
+-- in `public`. Naming both keeps digest() resolvable either way — Postgres
+-- ignores a schema in search_path that does not exist, so this is safe on both.
+set search_path = public, extensions, pg_temp;
+
 -- ---------------------------------------------------------------------------
 -- Membership. Roles are ordered: viewer < operator < owner.
 -- ---------------------------------------------------------------------------

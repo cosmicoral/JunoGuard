@@ -11,6 +11,11 @@
 
 create extension if not exists "pgcrypto";
 
+-- Hosted Supabase installs pgcrypto into `extensions`; a stock Postgres puts it
+-- in `public`. Naming both keeps digest() resolvable either way — Postgres
+-- ignores a schema in search_path that does not exist.
+set search_path = public, extensions, pg_temp;
+
 -- ---------------------------------------------------------------------------
 -- projects
 -- ---------------------------------------------------------------------------
@@ -61,7 +66,7 @@ create table if not exists policies (
     max_request_tokens      integer        not null default 4000,
     max_requests_per_min    integer        not null default 8,
     -- lowest Ossprey severity that causes a hard block
-    block_severity          text           not null default 'malicious'
+    block_severity          text           not null default 'unknown'
                             check (block_severity in ('malicious', 'suspicious', 'unknown')),
     -- suspend the whole project on a Lane A block, not just refuse the install
     suspend_on_malware      boolean        not null default true,

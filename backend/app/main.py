@@ -67,6 +67,20 @@ def controlled_project(
     Deliberately takes no agent key. Suspend and resume are human decisions, and
     a credential that lives in agent configs and CI environments is not a person.
     """
+    # Authentication is checked before anything about the request's shape.
+    # Otherwise a caller with no operator credential gets told which field they
+    # forgot, which is both a worse answer and a more informative one than an
+    # unauthenticated caller has earned.
+    if not (authorization or operator_token):
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": "operator_identity_required",
+                "detail": "Human control actions need a signed-in operator. An "
+                "agent key is not accepted here.",
+            },
+        )
+
     target = project_id or store.sole_project_id()
     if not target:
         raise HTTPException(

@@ -194,6 +194,21 @@ def test_agent_key_cannot_suspend(
     assert response.status_code == 401
 
 
+def test_control_plane_checks_auth_before_request_shape(
+    client: TestClient, agent_headers: dict[str, str]
+) -> None:
+    """401 regardless of whether the body names a project.
+
+    The project lookup used to run first, so an unauthenticated caller on a
+    multi-project deployment was told which field they had forgotten instead of
+    that they had no business here at all.
+    """
+    for body in ({}, {"project_id": "1a2b3c4d-0000-0000-0000-000000000000"}):
+        response = client.post("/v1/projects/suspend", headers=agent_headers, json=body)
+        assert response.status_code == 401, body
+        assert response.json()["detail"]["error"] == "operator_identity_required"
+
+
 # --- Anonymous / cross-project reads fail -----------------------------------
 
 
