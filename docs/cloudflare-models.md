@@ -34,6 +34,24 @@ input and halves output, on infrastructure you already pay for.
 
 ---
 
+## Verified through the gateway
+
+Not just against the API — these are `POST /v1/guard/llm` calls through Lane B,
+policy evaluation and pricing included. All four selected models: `allow`, exact
+answer, and **each priced at its own published rate**, which is what proves the
+pricing table is being read rather than the fallback.
+
+| Model | in/out | `cost_usd` | Latency |
+|---|---|---|---|
+| `@cf/meta/llama-3.1-8b-instruct-fp8` | 21/7 | 0.000005 | 2.07s (cold) |
+| `@cf/meta/llama-3.2-3b-instruct` | 45/7 | 0.000005 | 0.29s |
+| `@cf/openai/gpt-oss-120b` | 76/60 | 0.000072 | 1.08s |
+| `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | 45/7 | 0.000029 | 0.59s |
+
+All four are selectable per request via `{"model": "@cf/…"}`; the first is the
+deployment default. `gpt-oss-120b` needs `max_output_tokens` ≥ 200 — it spends
+the first ~150 on reasoning.
+
 ## Full results — all 26 tested
 
 Latency is one cold call each, London → Cloudflare. Treat as ranking, not SLA.
