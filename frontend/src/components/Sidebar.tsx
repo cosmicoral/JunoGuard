@@ -1,12 +1,24 @@
 import { BrandLockup } from "./BrandMark";
+import {
+  IconArrowRight,
+  IconControls,
+  IconExternal,
+  IconFeed,
+  IconIncidents,
+  IconOverview,
+} from "./Icons";
 
 export type DashboardSection = "overview" | "feed" | "incidents" | "controls";
 
-const NAV_ITEMS: { id: DashboardSection; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "feed", label: "Decision feed" },
-  { id: "incidents", label: "Incidents" },
-  { id: "controls", label: "Enforcement" },
+const NAV_ITEMS: {
+  id: DashboardSection;
+  label: string;
+  Icon: typeof IconOverview;
+}[] = [
+  { id: "overview", label: "Overview", Icon: IconOverview },
+  { id: "feed", label: "Decision feed", Icon: IconFeed },
+  { id: "incidents", label: "Incidents", Icon: IconIncidents },
+  { id: "controls", label: "Enforcement", Icon: IconControls },
 ];
 
 export const PRODUCT_LINKS = [
@@ -56,12 +68,13 @@ export function Sidebar({
     <aside className="sidebar" data-suspended={suspended}>
       <div className="sidebar-brand">
         <a href="/" aria-label="JunoGuard product home">
-          <BrandLockup className="sidebar-lockup" size={30} suspended={suspended} />
+          <BrandLockup className="sidebar-lockup" size={28} suspended={suspended} />
         </a>
       </div>
 
       <a className="sidebar-guide-cta" href="/#how">
-        How it works <span aria-hidden="true">→</span>
+        How it works
+        <IconArrowRight size={14} />
       </a>
 
       <nav className="sidebar-nav" aria-label="Dashboard sections">
@@ -74,6 +87,7 @@ export function Sidebar({
             data-active={activeSection === item.id}
             onClick={() => onNavigate(item.id)}
           >
+            <item.Icon size={15} className="sidebar-nav-icon" />
             {item.label}
           </button>
         ))}
@@ -83,11 +97,13 @@ export function Sidebar({
         <p className="sidebar-nav-label">Explore</p>
         {PRODUCT_LINKS.map((link) => (
           <a href={link.href} key={link.href}>
-            {link.label} <span aria-hidden="true">→</span>
+            {link.label}
+            <IconArrowRight size={13} />
           </a>
         ))}
         <a href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">
-          Source code <span aria-hidden="true">↗</span>
+          Source code
+          <IconExternal size={13} />
         </a>
       </nav>
 

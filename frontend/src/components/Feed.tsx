@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { clockTime, tokens, usdFine } from "../lib/format";
 import type { DataSource } from "../lib/supabase";
 import type { AgentAction, Decision } from "../lib/types";
+import { IconAllow, IconBlock, IconFlag } from "./Icons";
 
 const SOURCE_LABEL: Record<DataSource, string> = {
   supabase: "Realtime",
@@ -18,6 +19,11 @@ const BLOCK_FLASH = "rgba(248, 81, 73, 0.12)";
 const TRANSPARENT = "rgba(248, 81, 73, 0)";
 
 const LABEL: Record<Decision, string> = { allow: "ALLOW", flag: "FLAG", block: "BLOCK" };
+const DECISION_ICON: Record<Decision, ReactNode> = {
+  allow: <IconAllow size={13} />,
+  flag: <IconFlag size={13} />,
+  block: <IconBlock size={13} />,
+};
 
 /**
  * "BLOCKED" on its own leaves the room asking why. Two words of cause, pulled
@@ -218,6 +224,7 @@ function Row({
         </span>
 
         <span className="cell-decision" data-tone={action.decision}>
+          {DECISION_ICON[action.decision]}
           {LABEL[action.decision]}
         </span>
       </div>

@@ -2,6 +2,13 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { useAuth } from "./auth/AuthContext";
 import { BrandMark } from "./components/BrandMark";
+import {
+  IconArrowRight,
+  IconClock,
+  IconExternal,
+  IconShield,
+  IconSpend,
+} from "./components/Icons";
 import { AGENT_MARKS, STACK_MARKS } from "./components/SystemMarks";
 
 const PACKAGE = "@heysalad/junoguard";
@@ -130,38 +137,35 @@ export function Landing() {
           <a href="#pricing">Pricing</a>
           <a href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">GitHub</a>
         </nav>
-        <a className="nav-console" href={consoleHref}>{consoleLabel} <span>↗</span></a>
+        <a className="nav-console" href={consoleHref}>
+          {consoleLabel} <IconExternal size={13} />
+        </a>
       </header>
 
       <section className="landing-hero" id="top">
         <motion.div
           className="hero-copy"
-          initial={reduce ? false : { opacity: 0, y: 20 }}
+          initial={reduce ? false : { opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.65, ease: [0.23, 1, 0.32, 1] }}
+          transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
         >
-          {/* No lockup here — the nav carries the brand 40px above it, and
-              repeating it just pushes the headline down the fold. The brand
-              board's positioning line takes the eyebrow slot instead. */}
           <p className="hero-tagline">
             DIGITAL <em>TRUST</em>. CONTINUOUSLY.
           </p>
-          {/* The board sets one word of every headline in Emerald. Here it is
-              "control plane" — green reads as allowed across this product, so
-              it belongs on what Juno is, not on the blast radius. */}
           <h1>
             The <em>control plane</em> between your agent and the blast radius.
           </h1>
           <p className="hero-lede">
-            Every install, model call, and policy breach — decided before it
-            lands. One deterministic gate. Allow, flag, or stop.
+            Coding agents hold your keys and your shell. JunoGuard decides every
+            install and model call before damage lands — so you keep credentials,
+            budget, and the afternoon you would have spent in incident review.
           </p>
           <div className="hero-actions">
             <a className="primary-action" href={consoleHref}>
-              {consoleLabel} <span>→</span>
+              {consoleLabel} <IconArrowRight size={14} />
             </a>
-            <a className="secondary-action" href="#how">
-              See the gate in action
+            <a className="secondary-action" href="#value">
+              See what it protects
             </a>
           </div>
         </motion.div>
@@ -201,9 +205,49 @@ export function Landing() {
         </div>
       </div>
 
+      <section className="value-section" id="value">
+        <motion.div className="value-head" {...reveal}>
+          <p className="section-index">THE JOB / 01</p>
+          <h2>
+            Stop paying for blast radius
+            <br />
+            with time and money.
+          </h2>
+        </motion.div>
+        <div className="value-grid">
+          <motion.article className="value-card" {...reveal}>
+            <IconShield size={22} className="value-icon" />
+            <h3>Credentials stay put</h3>
+            <p>
+              Malicious installs never reach disk. Blast radius is computed from
+              real environment scope — so a block is proof of what would have
+              been stolen, not a vague warning.
+            </p>
+          </motion.article>
+          <motion.article className="value-card" {...reveal}>
+            <IconSpend size={22} className="value-icon" />
+            <h3>Budget stops runaway agents</h3>
+            <p>
+              Rate limits and daily spend caps kill hijacked loops before they
+              invoice you. No extra LLM on the hot path — protection does not
+              burn tokens to save tokens.
+            </p>
+          </motion.article>
+          <motion.article className="value-card" {...reveal}>
+            <IconClock size={22} className="value-icon" />
+            <h3>Hours back from incidents</h3>
+            <p>
+              One kill switch, accountable operators, and a decision feed with
+              evidence. The afternoon you would have spent reconstructing
+              &ldquo;what ran&rdquo; is already logged.
+            </p>
+          </motion.article>
+        </div>
+      </section>
+
       <section className="thesis-section" id="product">
         <motion.div {...reveal}>
-          <p className="section-index">THE PROBLEM / 01</p>
+          <p className="section-index">THE PROBLEM / 02</p>
           <h2>Your coding agent has your credentials, your shell, and no judgment.</h2>
         </motion.div>
         <motion.div className="thesis-copy" {...reveal}>
@@ -214,7 +258,7 @@ export function Landing() {
 
       <section className="gate-section" id="how">
         <div className="gate-intro">
-          <p className="section-index">THE GATE / 02</p>
+          <p className="section-index">THE GATE / 03</p>
           <h2>One decision engine.<br />Two attack lanes.</h2>
         </div>
         <div className="gate-grid">
@@ -249,16 +293,16 @@ export function Landing() {
 
       <section className="architecture-section" id="architecture">
         <div className="architecture-head">
-          <p className="section-index">ARCHITECTURE / 03</p>
+          <p className="section-index">ARCHITECTURE / 04</p>
           <h2>Fast where it must be.<br />Deep where it matters.</h2>
         </div>
         <div className="flow" aria-label="JunoGuard request flow">
           <div><span>01</span><strong>AGENT</strong><small>requests an action</small></div>
-          <i>→</i>
+          <span className="flow-arrow" aria-hidden="true"><IconArrowRight size={16} /></span>
           <div className="flow-core"><span>02</span><strong>JUNO</strong><small>evaluates policy</small></div>
-          <i>→</i>
+          <span className="flow-arrow" aria-hidden="true"><IconArrowRight size={16} /></span>
           <div><span>03</span><strong>DECISION</strong><small>allow / flag / block</small></div>
-          <i>→</i>
+          <span className="flow-arrow" aria-hidden="true"><IconArrowRight size={16} /></span>
           <div><span>04</span><strong>EVIDENCE</strong><small>records the radius</small></div>
         </div>
         <div className="principles">
@@ -271,7 +315,7 @@ export function Landing() {
 
       <section className="install-section" id="install">
         <div className="install-head">
-          <p className="section-index">INSTALL / 04</p>
+          <p className="section-index">INSTALL / 05</p>
           <h2>One command.<br />Every agent you use.</h2>
           <p className="install-lede">
             JunoGuard ships as an MCP server and a CLI in one package. Point your
@@ -279,7 +323,7 @@ export function Landing() {
             through the guard are checked first.
           </p>
           <a className="text-action" href={NPM_URL} target="_blank" rel="noreferrer">
-            {PACKAGE} on npm ↗
+            {PACKAGE} on npm <IconExternal size={13} />
           </a>
         </div>
 
@@ -301,7 +345,7 @@ export function Landing() {
 
       <section className="pricing-section" id="pricing">
         <div className="pricing-head">
-          <p className="section-index">PRICING / 05</p>
+          <p className="section-index">PRICING / 06</p>
           <h2>One pound.<br />Once. Forever.</h2>
           <p className="pricing-lede">
             A launch price for the developers who show up early. Pay once, keep
@@ -327,11 +371,11 @@ export function Landing() {
 
           {CHECKOUT_URL ? (
             <a className="primary-action pricing-cta" href={CHECKOUT_URL}>
-              Get lifetime access <span>→</span>
+              Get lifetime access <IconArrowRight size={14} />
             </a>
           ) : (
             <a className="secondary-action pricing-cta" href={NPM_URL} target="_blank" rel="noreferrer">
-              Install free while checkout opens <span>→</span>
+              Install free while checkout opens <IconArrowRight size={14} />
             </a>
           )}
 
@@ -343,11 +387,15 @@ export function Landing() {
       </section>
 
       <section className="final-cta">
-        <p className="section-index">READY / 06</p>
+        <p className="section-index">READY / 07</p>
         <h2>Give your agent<br />a gate before the blast radius.</h2>
         <div>
-          <a className="primary-action" href={consoleHref}>{consoleLabel} <span>→</span></a>
-          <a className="text-action" href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">Read the source on GitHub ↗</a>
+          <a className="primary-action" href={consoleHref}>
+            {consoleLabel} <IconArrowRight size={14} />
+          </a>
+          <a className="text-action" href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">
+            Read the source on GitHub <IconExternal size={13} />
+          </a>
         </div>
       </section>
 

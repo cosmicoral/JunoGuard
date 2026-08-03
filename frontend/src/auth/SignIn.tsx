@@ -56,7 +56,7 @@ export function SignIn() {
           <a href="/#how">How it works</a>
           <a href="/#install">Install</a>
           <a href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">
-            GitHub ↗
+            GitHub
           </a>
         </nav>
         <a className="auth-nav-home" href="/">Back home</a>
