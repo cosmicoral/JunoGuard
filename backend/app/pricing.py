@@ -13,6 +13,21 @@ PRICING: dict[str, tuple[float, float]] = {
     "claude-sonnet-5": (3.00, 15.00),
     "claude-haiku-4-5": (1.00, 5.00),
     "gemini-2.5-pro": (1.25, 10.00),
+    # Cloudflare Workers AI, keyed on the full model id the client sends.
+    # Published per-token rates, not derived from neurons: Cloudflare bills
+    # neurons ($0.011/1000) and reports them per call, but a budget has to be
+    # reserved before the call, so the token rate is what can be used here.
+    # Without these the fallback over-prices Workers AI by up to 20x, which
+    # trips daily budgets early and makes reported spend fiction.
+    "@cf/meta/llama-3.2-1b-instruct": (0.027, 0.201),
+    "@cf/meta/llama-3.2-3b-instruct": (0.051, 0.335),
+    "@cf/meta/llama-3.1-8b-instruct-fp8": (0.152, 0.287),
+    "@cf/meta/llama-4-scout-17b-16e-instruct": (0.270, 0.850),
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast": (0.293, 2.253),
+    "@cf/mistralai/mistral-small-3.1-24b-instruct": (0.351, 0.555),
+    "@cf/qwen/qwen2.5-coder-32b-instruct": (0.660, 1.000),
+    "@cf/openai/gpt-oss-20b": (0.200, 0.300),
+    "@cf/openai/gpt-oss-120b": (0.350, 0.750),
 }
 
 FALLBACK = (1.00, 5.00)

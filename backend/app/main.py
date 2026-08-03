@@ -147,7 +147,11 @@ class UnscannedRequest(BaseModel):
 
 class LLMRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=200_000)
-    model: str = "gpt-4o"
+    # Defaults to whatever this deployment is actually pointed at. A hardcoded
+    # `gpt-4o` was a silent bet that the provider is OpenAI: against a Workers AI
+    # base URL every unqualified call 404s on a model that host has never heard
+    # of. A client may still name any model the provider accepts.
+    model: str = config.PROVIDER_MODEL
     max_output_tokens: int = Field(default=300, ge=1, le=32_000)
 
 
