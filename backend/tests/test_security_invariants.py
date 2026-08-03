@@ -437,35 +437,42 @@ def test_flagged_charges_count_in_daily_spend(memory_store: MemoryStore) -> None
 
 def test_concurrent_reservations_respect_rate_limit(memory_store: MemoryStore) -> None:
     """Open reservations count toward the cap, under the per-project lock."""
-    import time
-
     project_id = memory_store.project["id"]
+    attempts, limit = 12, 3
+
     release = threading.Event()
+    # One party per worker plus the main thread. A barrier rather than polling
+    # for the first three winners: a thread that had not reached `reserve` yet
+    # would otherwise take a slot that had already been handed back, and the
+    # number of winners would depend on how the machine scheduled threads.
+    attempted = threading.Barrier(attempts + 1, timeout=10)
     outcomes: list[str] = []
     lock = threading.Lock()
 
     def attempt() -> None:
-        reservation = memory_store.reserve(project_id, 0.01, 10.0, 3)
+        reservation = memory_store.reserve(project_id, 0.01, 10.0, limit)
         with lock:
             outcomes.append(reservation.outcome)
+        attempted.wait()
         if reservation.outcome == "ok":
-            assert release.wait(timeout=5)
+            assert release.wait(timeout=10)
             memory_store.release(reservation.reservation_id)
 
-    with ThreadPoolExecutor(max_workers=12) as pool:
-        futures = [pool.submit(attempt) for _ in range(12)]
-        deadline = time.time() + 5
-        while sum(1 for o in outcomes if o == "ok") < 3 and time.time() < deadline:
-            time.sleep(0.01)
-        assert sum(1 for o in outcomes if o == "ok") == 3
-        # While those three are held, further reserves must be refused.
-        assert memory_store.reserve(project_id, 0.01, 10.0, 3).outcome == "rate_exceeded"
+    # Must equal `attempts`, or the barrier waits for a worker that never runs.
+    with ThreadPoolExecutor(max_workers=attempts) as pool:
+        futures = [pool.submit(attempt) for _ in range(attempts)]
+        attempted.wait()
+
+        assert outcomes.count("ok") == limit
+        # While those three are held, a further reserve must be refused.
+        assert memory_store.reserve(project_id, 0.01, 10.0, limit).outcome == "rate_exceeded"
+
         release.set()
         for future in futures:
-            future.result(timeout=5)
+            future.result(timeout=10)
 
-    assert outcomes.count("ok") == 3
-    assert outcomes.count("rate_exceeded") == 9
+    assert outcomes.count("ok") == limit
+    assert outcomes.count("rate_exceeded") == attempts - limit
 
 
 # --- Blocked calls never reach the provider ---------------------------------

@@ -13,7 +13,8 @@
  */
 
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import pc from "picocolors";
 
 import {
@@ -477,6 +478,25 @@ async function cmdWatch(argv: string[]): Promise<number> {
   }
 }
 
+/**
+ * Whether a path sits inside a git working tree.
+ *
+ * Project-scope agent config is normally committed — `.cursor/mcp.json` and
+ * `.mcp.json` are checked in on purpose, so the team shares one setup. That is
+ * fine until an env block carries a project key, at which point `init` has
+ * quietly staged a live credential for publication. Walking up for `.git`
+ * answers this without shelling out to git, which may not be installed.
+ */
+function insideGitRepo(filePath: string): boolean {
+  let dir = dirname(resolve(filePath));
+  for (;;) {
+    if (existsSync(resolve(dir, ".git"))) return true;
+    const parent = dirname(dir);
+    if (parent === dir) return false;
+    dir = parent;
+  }
+}
+
 function cmdInit(argv: string[], packageName: string): number {
   const flags = parseFlags(argv);
   const scope: Scope = flags.bools.global ? "global" : "project";
@@ -524,6 +544,7 @@ function cmdInit(argv: string[], packageName: string): number {
   console.log();
 
   let failures = 0;
+  const written: string[] = [];
   const hookCommand = flags.bools.local
     ? `${process.execPath} ${new URL("./bin.js", import.meta.url).pathname} hook shell`
     : `npx -y ${packageName} hook shell`;
@@ -537,6 +558,7 @@ function cmdInit(argv: string[], packageName: string): number {
     const name = agent.label.padEnd(13);
     switch (result.kind) {
       case "written":
+        written.push(result.path);
         say(`  ✓ ${name}${result.path}${result.created ? "  (created)" : ""}`, "allow");
         break;
       case "exists":
@@ -593,6 +615,21 @@ function cmdInit(argv: string[], packageName: string): number {
     say("no JUNO_PROJECT_KEY in your environment — the config is incomplete.", "flag");
     say("  add one to the env block above, or re-run with --mock to try it offline.", "dim");
     console.log();
+  }
+  // Keyed off what was actually written, not what is in the environment: mock
+  // mode writes no key, so there is nothing to leak.
+  if (env.JUNO_PROJECT_KEY && !dryRun) {
+    const tracked = written.filter(insideGitRepo);
+    if (tracked.length) {
+      // Loud, because the failure is silent and permanent: the key works, so
+      // nothing misbehaves until it is on a public remote and someone else has
+      // it. Rotating afterwards is the only fix.
+      say("your project key was written inside a git repository:", "block");
+      for (const path of tracked) say(`  ${path}`, "dim");
+      say("  commit that and the key is published. Prefer --global, which writes", "dim");
+      say("  outside the repo, or drop the env block and export JUNO_PROJECT_KEY.", "dim");
+      console.log();
+    }
   }
   if (flags.bools.local) {
     say("--local wrote an absolute path to this checkout, for pre-publish testing.", "flag");
