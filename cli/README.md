@@ -54,13 +54,13 @@ the CLI says so out loud rather than implying they were approved.
 
 | Code | Meaning |
 |---|---|
-| `0` | allowed (or flagged — flags do not stop the install) |
-| `2` | blocked by policy |
+| `0` | allowed |
+| `2` | blocked or flagged by policy (flagged installs need `--allow-flagged`) |
 | `3` | the guard could not be consulted |
+| `5` | source cannot be scanned (lockfile / local / git / URL) without an audited override |
 
-`2` and `3` are deliberately distinct: "Juno said no" and "Juno was down" are
-different problems, and CI should be able to tell them apart. Both stop the
-install — an unreachable guard is not permission to proceed.
+`2`, `3`, and `5` all stop the install — an unreachable or unscanned path is not
+permission to proceed. CI should treat them as distinct failures.
 
 ---
 
@@ -69,7 +69,7 @@ install — an unreachable guard is not permission to proceed.
 | Variable | Default | Meaning |
 |---|---|---|
 | `JUNO_API_URL` | `http://localhost:8000` | Gateway base URL |
-| `JUNO_PROJECT_KEY` | `jg_demo_key_cursorhack2026` | Sent as `X-Juno-Key` |
+| `JUNO_PROJECT_KEY` | **none — required for live use** | Sent as `X-Juno-Key` |
 | `JUNO_MOCK` | unset (live) | `1` for offline fixtures, no network at all |
 | `JUNO_TIMEOUT` | `100` | Seconds before a gateway call gives up |
 

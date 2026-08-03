@@ -32,18 +32,35 @@ Ctrl-C.
 
 ## Connect it to Cursor
 
-`.cursor/mcp.json` at the repo root is already committed:
+Project-scoped config lives at `.cursor/mcp.json`. Prefer the published npm
+client when you can; the Python module is for local gateway development:
 
 ```json
 {
   "mcpServers": {
     "junoguard": {
-      "command": "/Users/chilumbam/TokenGuard/mcp/.venv/bin/python",
+      "command": "npx",
+      "args": ["-y", "@heysalad/junoguard", "mcp"],
+      "env": {
+        "JUNO_API_URL": "http://localhost:8000",
+        "JUNO_PROJECT_KEY": "YOUR_PROJECT_KEY"
+      }
+    }
+  }
+}
+```
+
+For a checkout of this repo instead of npm:
+
+```json
+{
+  "mcpServers": {
+    "junoguard": {
+      "command": "/absolute/path/to/mcp/.venv/bin/python",
       "args": ["-m", "juno_mcp"],
       "env": {
         "JUNO_API_URL": "http://localhost:8000",
-        "JUNO_PROJECT_KEY": "jg_demo_key_cursorhack2026",
-        "JUNO_MOCK": "0"
+        "JUNO_PROJECT_KEY": "YOUR_PROJECT_KEY"
       }
     }
   }
@@ -52,17 +69,19 @@ Ctrl-C.
 
 Then:
 
-1. **Edit the `command` path** if the repo is not at `/Users/chilumbam/TokenGuard`.
-   It must be an absolute path to `mcp/.venv/bin/python`. Cursor does not
-   expand `~` or `${workspaceFolder}` reliably here.
-2. Open the repo in Cursor: `open -a Cursor /Users/chilumbam/TokenGuard`
-3. **Cursor Settings → MCP & Integrations.** `junoguard` will be listed but
+1. **Edit `JUNO_PROJECT_KEY`** to a real project key from your gateway. There is
+   no default key — an empty value refuses live calls.
+2. If you use the Python module, **edit the `command` path** to an absolute
+   path to `mcp/.venv/bin/python`. Cursor does not expand `~` or
+   `${workspaceFolder}` reliably here.
+3. Open the repo in Cursor.
+4. **Cursor Settings → MCP & Integrations.** `junoguard` will be listed but
    **disabled** — Cursor does not auto-start a project MCP server the first
    time it sees one, since `.cursor/mcp.json` is untrusted repo content.
    **Toggle it on.** This click is required once per machine; nothing else
    will start the server.
-4. It should go green with three tools. If it stays red, hit refresh.
-5. In the Agent pane, ask: *"check junoguard status"*. You should get the
+5. It should go green with three tools. If it stays red, hit refresh.
+6. In the Agent pane, ask: *"check junoguard status"*. You should get the
    status panel back.
 
 Do this before the demo, not during it.
@@ -129,7 +148,7 @@ visible in a diff. Signed definitions (ETDI) are the next increment.
 | Variable | Default | Meaning |
 |---|---|---|
 | `JUNO_API_URL` | `http://localhost:8000` | Gateway base URL |
-| `JUNO_PROJECT_KEY` | `jg_demo_key_cursorhack2026` | Sent as `X-Juno-Key` |
+| `JUNO_PROJECT_KEY` | **none — required for live use** | Sent as `X-Juno-Key` |
 | `JUNO_MOCK` | unset (live) | `1` for offline fixtures, no network at all |
 | `JUNO_TIMEOUT` | `100` | Seconds before a gateway call gives up |
 | `JUNO_MCP_ALLOW_UNPINNED` | unset | `1` serves an unverified tool surface (development only) |
