@@ -1,11 +1,11 @@
-import post01 from "@docs-blog/01-coding-agent-blast-radius.md?raw";
-import post02 from "@docs-blog/02-agent-productive-without-blast-radius.md?raw";
-import post03 from "@docs-blog/03-what-unguarded-agent-costs.md?raw";
-import post04 from "@docs-blog/04-demo-blocking-ossprey-test-package.md?raw";
-import post05 from "@docs-blog/05-npx-init-wire-agents.md?raw";
-import post06 from "@docs-blog/06-honest-limits.md?raw";
-import post07 from "@docs-blog/07-no-llm-on-hot-path.md?raw";
-import post08 from "@docs-blog/08-mcp-tools-lock.md?raw";
+import post01 from "./content/01-coding-agent-blast-radius.md?raw";
+import post02 from "./content/02-agent-productive-without-blast-radius.md?raw";
+import post03 from "./content/03-what-unguarded-agent-costs.md?raw";
+import post04 from "./content/04-demo-blocking-ossprey-test-package.md?raw";
+import post05 from "./content/05-npx-init-wire-agents.md?raw";
+import post06 from "./content/06-honest-limits.md?raw";
+import post07 from "./content/07-no-llm-on-hot-path.md?raw";
+import post08 from "./content/08-mcp-tools-lock.md?raw";
 
 export type BlogPostMeta = {
   slug: string;
