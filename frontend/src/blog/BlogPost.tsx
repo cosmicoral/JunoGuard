@@ -16,7 +16,7 @@ export function BlogPost({ slug }: { slug: string }) {
 
   if (!post) {
     return (
-      <main className="blog-shell">
+      <main className="landing-shell blog-shell">
         <header className="landing-nav blog-nav">
           <a className="landing-brand" href="/" aria-label="JunoGuard home">
             <BrandMark className="landing-mark" size={29} />
@@ -42,7 +42,7 @@ export function BlogPost({ slug }: { slug: string }) {
   const others = BLOG_POSTS.filter((p) => p.slug !== post.slug).slice(0, 3);
 
   return (
-    <main className="blog-shell">
+    <main className="landing-shell blog-shell">
       <header className="landing-nav blog-nav">
         <a className="landing-brand" href="/" aria-label="JunoGuard home">
           <BrandMark className="landing-mark" size={29} />

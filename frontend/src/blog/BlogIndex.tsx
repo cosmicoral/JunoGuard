@@ -11,7 +11,7 @@ function formatDate(iso: string): string {
 
 export function BlogIndex() {
   return (
-    <main className="blog-shell">
+    <main className="landing-shell blog-shell">
       <header className="landing-nav blog-nav">
         <a className="landing-brand" href="/" aria-label="JunoGuard home">
           <BrandMark className="landing-mark" size={29} />
