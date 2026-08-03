@@ -10,9 +10,12 @@ npm run dev          # http://localhost:5173
 ```
 
 The landing and sign-in screens run without a backend. Dashboard access uses
-Google or GitHub OAuth through Supabase and therefore requires the two Supabase
-frontend variables below. The FastAPI gateway remains optional for the
+Google, GitHub, or email magic link through Supabase and therefore requires the
+two Supabase frontend variables below. The FastAPI gateway remains optional for the
 dashboard; with Supabase configured, the feed comes from Supabase Realtime.
+
+Guard installs and model calls through MCP or the CLI do **not** require
+sign-in — only the live console does.
 
 ## OAuth providers
 
@@ -38,6 +41,18 @@ redirect allow list. Then copy `.env.example` to `.env.local` and set
    callback URL to `https://<project-ref>.supabase.co/auth/v1/callback`.
 2. In Supabase Authentication → Providers, enable GitHub and add the OAuth
    app's client ID and client secret.
+
+### Email magic link
+
+1. In Supabase Authentication → Providers, enable **Email**.
+2. Leave **Confirm email** enabled so first-time addresses are verified.
+3. Optional: disable **Secure email change** if you do not need it yet.
+4. Under Authentication → URL Configuration, ensure `/auth/callback` is on the
+   redirect allow list (same as OAuth).
+5. Customize the magic-link email template if you want JunoGuard branding.
+
+Users enter an email on `/auth/sign-in`, receive a one-time link, and land back
+on `/auth/callback` with the same PKCE exchange as OAuth.
 
 Finally, apply the ordered migrations (works on an empty database and is safe
 to re-run):

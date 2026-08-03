@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { isSupabaseConfigured } from "../lib/supabase";
 import { useAuth, type OAuthProvider } from "./AuthContext";
 import { BrandMark } from "../components/BrandMark";
@@ -23,9 +23,14 @@ function GitHubMark() {
 }
 
 export function SignIn() {
-  const { loading, session, signInWithProvider } = useAuth();
+  const { loading, session, signInWithProvider, signInWithEmail } = useAuth();
   const [submittingProvider, setSubmittingProvider] = useState<OAuthProvider | null>(null);
+  const [email, setEmail] = useState("");
+  const [emailSent, setEmailSent] = useState(false);
+  const [submittingEmail, setSubmittingEmail] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const busy = loading || Boolean(submittingProvider) || submittingEmail || Boolean(session);
 
   useEffect(() => {
     if (!loading && session) window.location.replace("/dashboard");
@@ -41,6 +46,22 @@ export function SignIn() {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : `Unable to start ${provider} sign-in.`);
       setSubmittingProvider(null);
+    }
+  };
+
+  const submitEmail = async (event: FormEvent) => {
+    event.preventDefault();
+    if (submittingEmail || !email.trim()) return;
+    setSubmittingEmail(true);
+    setError(null);
+
+    try {
+      await signInWithEmail(email);
+      setEmailSent(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to send the sign-in link.");
+    } finally {
+      setSubmittingEmail(false);
     }
   };
 
@@ -68,33 +89,91 @@ export function SignIn() {
           JUNOGUARD
         </a>
         <p className="auth-kicker">Console access</p>
-        <h1>Sign in to JunoGuard</h1>
-        <p>Use Google or GitHub to review Allow / Flag / Block decisions and enforce policy.</p>
+        <h1>Sign in to the live console</h1>
+        <p className="auth-lede">
+          Guarding installs and model calls through MCP or the CLI does not require an account.
+          Sign in here to review Allow / Flag / Block decisions, open incidents, and use the kill switch.
+        </p>
 
-        <div className="auth-provider-list">
-          <button
-            className="oauth-sign-in google-provider"
-            type="button"
-            onClick={() => void signIn("google")}
-            disabled={!isSupabaseConfigured || loading || Boolean(submittingProvider) || Boolean(session)}
-          >
-            <GoogleMark />
-            {submittingProvider === "google" ? "Redirecting to Google…" : "Continue with Google"}
-          </button>
+        {emailSent ? (
+          <div className="auth-email-sent" role="status">
+            <p className="auth-email-sent-title">Check your inbox</p>
+            <p>
+              We sent a sign-in link to <strong>{email.trim()}</strong>. Open it on this device to
+              reach the console.
+            </p>
+            <button
+              className="auth-email-resend"
+              type="button"
+              onClick={() => {
+                setEmailSent(false);
+                setError(null);
+              }}
+            >
+              Use a different email
+            </button>
+          </div>
+        ) : (
+          <>
+            <form className="auth-email-form" onSubmit={(event) => void submitEmail(event)}>
+              <label className="auth-email-label" htmlFor="auth-email">
+                Email
+              </label>
+              <div className="auth-email-row">
+                <input
+                  id="auth-email"
+                  className="auth-email-input"
+                  type="email"
+                  name="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  disabled={!isSupabaseConfigured || busy}
+                  required
+                />
+                <button
+                  className="auth-email-submit"
+                  type="submit"
+                  disabled={!isSupabaseConfigured || busy || !email.trim()}
+                >
+                  {submittingEmail ? "Sending…" : "Send link"}
+                </button>
+              </div>
+              <p className="auth-email-hint">Passwordless — we email a one-time sign-in link.</p>
+            </form>
 
-          <button
-            className="oauth-sign-in github-provider"
-            type="button"
-            onClick={() => void signIn("github")}
-            disabled={!isSupabaseConfigured || loading || Boolean(submittingProvider) || Boolean(session)}
-          >
-            <GitHubMark />
-            {submittingProvider === "github" ? "Redirecting to GitHub…" : "Continue with GitHub"}
-          </button>
-        </div>
+            <p className="auth-divider" aria-hidden="true">
+              <span>or continue with</span>
+            </p>
 
-        <a className="auth-skip" href="/">
-          Continue to the JunoGuard homepage
+            <div className="auth-provider-list">
+              <button
+                className="oauth-sign-in google-provider"
+                type="button"
+                onClick={() => void signIn("google")}
+                disabled={!isSupabaseConfigured || busy}
+              >
+                <GoogleMark />
+                {submittingProvider === "google" ? "Redirecting to Google…" : "Continue with Google"}
+              </button>
+
+              <button
+                className="oauth-sign-in github-provider"
+                type="button"
+                onClick={() => void signIn("github")}
+                disabled={!isSupabaseConfigured || busy}
+              >
+                <GitHubMark />
+                {submittingProvider === "github" ? "Redirecting to GitHub…" : "Continue with GitHub"}
+              </button>
+            </div>
+          </>
+        )}
+
+        <a className="auth-skip" href="/#install">
+          Skip sign-in — install the guard with npx
         </a>
 
         {!isSupabaseConfigured && (
@@ -104,7 +183,9 @@ export function SignIn() {
         )}
         {error && <p className="auth-error" role="alert">{error}</p>}
 
-        <p className="auth-footnote">Protected by Supabase Auth. JunoGuard never receives your provider password.</p>
+        <p className="auth-footnote">
+          Protected by Supabase Auth. JunoGuard never receives your provider password.
+        </p>
         <nav className="auth-card-links" aria-label="More JunoGuard links">
           <a href="/#product">Explore the product</a>
           <a href="/#install">View setup guide</a>

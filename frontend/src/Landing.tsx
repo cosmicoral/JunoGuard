@@ -19,7 +19,7 @@ const PRICING_INCLUDED = [
   "Both lanes — supply chain and token spend",
   "Blast radius on every block",
   "Kill switch with an accountable operator",
-  "Google and GitHub sign-in",
+  "Google, GitHub, and email sign-in",
   "Every future update, at no extra cost",
 ];
 
@@ -113,7 +113,7 @@ export function Landing() {
   const reduce = useReducedMotion() ?? false;
   const reveal = reduce ? {} : { initial: { opacity: 0, y: 18 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: 0.2 }, transition: { duration: 0.55, ease: [0.23, 1, 0.32, 1] as const } };
   const consoleHref = session ? "/dashboard" : "/auth/sign-in";
-  const consoleLabel = session ? "Open live console" : "Live console · sign in";
+  const consoleLabel = session ? "Open live console" : "Sign in · live console";
 
   return (
     <main className="landing-shell">
@@ -156,12 +156,16 @@ export function Landing() {
             Every install, model call, and policy breach — decided before it
             lands. One deterministic gate. Allow, flag, or stop.
           </p>
+          <p className="hero-note">
+            No account needed to guard your agent — run <code>npx {PACKAGE} init</code> and go.
+            Sign in only when you want the live console.
+          </p>
           <div className="hero-actions">
             <a className="primary-action" href={consoleHref}>
               {consoleLabel} <span>→</span>
             </a>
-            <a className="secondary-action" href="#how">
-              See the gate in action
+            <a className="secondary-action" href="#install">
+              Install without signing in
             </a>
           </div>
         </motion.div>

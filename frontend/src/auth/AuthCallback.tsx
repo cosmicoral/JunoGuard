@@ -34,12 +34,12 @@ export function AuthCallback() {
 
       const { data, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) throw sessionError;
-      if (!data.session) throw new Error("OAuth sign-in completed without a session.");
+      if (!data.session) throw new Error("Sign-in completed without a session.");
 
       window.location.replace("/dashboard");
     })().catch((reason: unknown) => {
       if (!active) return;
-      setError(reason instanceof Error ? reason.message : "Unable to complete OAuth sign-in.");
+      setError(reason instanceof Error ? reason.message : "Unable to complete sign-in.");
     });
 
     return () => {
@@ -66,7 +66,7 @@ export function AuthCallback() {
             <div className="auth-spinner" aria-hidden="true" />
             <p className="auth-kicker">Session</p>
             <h1>Completing sign-in…</h1>
-            <p>Exchanging the provider authorization for your console session.</p>
+            <p>Finishing your console session.</p>
           </>
         )}
       </section>

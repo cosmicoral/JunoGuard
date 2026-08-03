@@ -16,6 +16,7 @@ export interface AuthContextValue {
   session: Session | null;
   user: User | null;
   signInWithProvider: (provider: OAuthProvider) => Promise<void>;
+  signInWithEmail: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -65,6 +66,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           provider,
           options: {
             redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+        if (error) throw error;
+      },
+      signInWithEmail: async (email) => {
+        if (!supabase) throw new Error("Supabase is not configured.");
+        const { error } = await supabase.auth.signInWithOtp({
+          email: email.trim(),
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
         });
         if (error) throw error;
