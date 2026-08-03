@@ -14,7 +14,14 @@ import { collectAgentScope } from "./scope.js";
 import type { Ecosystem, Envelope, InstallResult, LlmResult, StatusResult } from "./types.js";
 
 export const DEFAULT_API_URL = "http://localhost:8000";
-const DEFAULT_TIMEOUT_MS = 20_000;
+
+// Must outlive the gateway's own scan budget (OSSPREY_SCAN_BUDGET_SECONDS, 90s).
+// The gateway already bounds how long a verdict may take and refuses as
+// unscanned past that; a client that gives up first turns a verdict that was
+// coming into a fail-closed refusal, so a clean package is rejected on nothing
+// but a stopwatch. Measured against the live pair, a cold scan of a popular
+// package runs 19-35s and only the first request for a version pays it.
+const DEFAULT_TIMEOUT_MS = 100_000;
 
 const TRUTHY = new Set(["1", "true", "yes", "on"]);
 

@@ -71,7 +71,7 @@ install — an unreachable guard is not permission to proceed.
 | `JUNO_API_URL` | `http://localhost:8000` | Gateway base URL |
 | `JUNO_PROJECT_KEY` | `jg_demo_key_cursorhack2026` | Sent as `X-Juno-Key` |
 | `JUNO_MOCK` | unset (live) | `1` for offline fixtures, no network at all |
-| `JUNO_TIMEOUT` | `20` | Seconds before a gateway call gives up |
+| `JUNO_TIMEOUT` | `100` | Seconds before a gateway call gives up |
 
 ```bash
 JUNO_MOCK=1 juno npm install @ossprey/test-package

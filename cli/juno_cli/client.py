@@ -21,7 +21,9 @@ import httpx
 
 DEFAULT_API_URL = "http://localhost:8000"
 DEFAULT_PROJECT_KEY = "jg_demo_key_cursorhack2026"
-DEFAULT_TIMEOUT = 20.0
+# Must outlive the gateway's own scan budget (OSSPREY_SCAN_BUDGET_SECONDS, 90s).
+# Giving up first turns a verdict that was coming into a fail-closed refusal.
+DEFAULT_TIMEOUT = 100.0
 
 _TRUTHY = {"1", "true", "yes", "on"}
 _ENV_FILES = (".env", ".env.local", ".env.development", ".env.production")
