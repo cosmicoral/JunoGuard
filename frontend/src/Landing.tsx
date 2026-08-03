@@ -133,6 +133,7 @@ export function Landing() {
           <a href="#product">Product</a>
           <a href="#how">How it works</a>
           <a href="#architecture">Architecture</a>
+          <a href="/blog">Blog</a>
           <a href="#install">Install</a>
           <a href="#pricing">Pricing</a>
           <a href="https://github.com/cosmicoral/JunoGuard" target="_blank" rel="noreferrer">GitHub</a>
