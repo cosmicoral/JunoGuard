@@ -9,6 +9,7 @@ import {
   hookShellResponse,
   isAlreadyJunoGated,
   isUngatedInstallCommand,
+  writeClaudeHooks,
   writeCursorHooks,
 } from "../dist/hooks.js";
 
@@ -67,6 +68,31 @@ test("hook shell strips UTF-8 BOM from Cursor payloads", () => {
   assert.equal(body.permission, "deny");
 });
 
+test("Claude PreToolUse Bash payloads deny ungated installs", () => {
+  const payload = JSON.stringify({
+    hook_event_name: "PreToolUse",
+    tool_name: "Bash",
+    tool_input: { command: "npm install lodash" },
+  });
+  const body = JSON.parse(hookShellResponse(payload));
+  assert.equal(body.hookSpecificOutput.permissionDecision, "deny");
+  assert.match(body.hookSpecificOutput.permissionDecisionReason, /guard_install|juno/i);
+});
+
+test("Claude PreToolUse allows juno-gated and non-install shells", () => {
+  for (const command of ["juno npm install lodash", "npm test", "git status"]) {
+    const body = JSON.parse(
+      hookShellResponse(
+        JSON.stringify({
+          tool_name: "Bash",
+          tool_input: { command },
+        }),
+      ),
+    );
+    assert.equal(body.hookSpecificOutput.permissionDecision, "allow", command);
+  }
+});
+
 test("hooks.json merge preserves neighbors and is replaceable with --force", () => {
   mkdirSync(fixturesRoot, { recursive: true });
   const cwd = mkdtempSync(join(fixturesRoot, "case-"));
@@ -107,4 +133,48 @@ test("hooks.json merge preserves neighbors and is replaceable with --force", () 
   assert.equal(config.hooks.beforeShellExecution[0].command, "./hooks/audit.sh");
   assert.equal(config.hooks.beforeShellExecution[1].failClosed, true);
   assert.match(config.hooks.beforeShellExecution[1].command, /hook shell/);
+});
+
+test("Claude settings.json merge preserves neighbors and is replaceable with --force", () => {
+  mkdirSync(fixturesRoot, { recursive: true });
+  const cwd = mkdtempSync(join(fixturesRoot, "claude-"));
+  temporaryDirectories.push(cwd);
+  const settingsPath = join(cwd, "settings.json");
+  writeFileSync(
+    settingsPath,
+    `${JSON.stringify(
+      {
+        hooks: {
+          PreToolUse: [
+            {
+              matcher: "Write",
+              hooks: [{ type: "command", command: "./hooks/audit-write.sh" }],
+            },
+          ],
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  const first = writeClaudeHooks("project", cwd, "npx -y @heysalad/junoguard hook shell", {
+    settingsPath,
+  });
+  assert.equal(first.kind, "written");
+  const second = writeClaudeHooks("project", cwd, "npx -y @heysalad/junoguard hook shell", {
+    settingsPath,
+  });
+  assert.equal(second.kind, "exists");
+  const forced = writeClaudeHooks("project", cwd, "npx -y @heysalad/junoguard hook shell", {
+    force: true,
+    settingsPath,
+  });
+  assert.equal(forced.kind, "written");
+
+  const config = JSON.parse(readFileSync(settingsPath, "utf8"));
+  assert.equal(config.hooks.PreToolUse.length, 2);
+  assert.equal(config.hooks.PreToolUse[0].matcher, "Write");
+  assert.equal(config.hooks.PreToolUse[1].matcher, "Bash");
+  assert.match(config.hooks.PreToolUse[1].hooks[0].command, /hook shell/);
 });

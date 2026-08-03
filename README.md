@@ -139,9 +139,10 @@ Every package the agent tries to install is intercepted **before** it reaches di
   calling the tool. `juno npm|pnpm|yarn|pip …` closes the gap for installs that
   go through the CLI. `juno wrap on` adds project-local PATH shims so bare
   package-manager invocations hit the same gate; absolute paths to the real
-  binary still bypass. `juno init` also writes a Cursor `beforeShellExecution`
-  hook that denies ungated installs inside the agent shell. A kernel boundary
-  that every agent genuinely cannot step around is not implemented.
+  binary still bypass. `juno init` also writes Cursor `beforeShellExecution`
+  and Claude Code `PreToolUse` Bash hooks that deny ungated installs inside
+  those agent shells. A kernel boundary that every agent genuinely cannot step
+  around is not implemented.
 - [Ossprey](https://ossprey.com) malware verdict
 - Registry-backed CycloneDX 1.6 SBOM for the exact package coordinate
 - Optional Docker detonation of non-clean npm lifecycle scripts and PyPI
@@ -164,7 +165,7 @@ A hijacked agent burns tokens abnormally. Burst detection here is exfiltration t
 - Per-request and daily budget caps
 - Maximum tokens per request
 - Request rate limiting
-- Burst and anomaly detection
+- Burst and rate limiting
 
 ### Blast radius
 
@@ -234,9 +235,10 @@ what is still an intention.
 | Sandbox detonation on Modal, cold path | **live** | `modal_worker/detonate.py`, reached from a hosted gateway with `PUBLIC_BASE_URL` set; a blocked install's report lands on the action's `metadata.detonation` and on the linked incident's `evidence` |
 | PATH wrap for bare package-manager installs | **live (opt-in)** | `juno wrap on` → `.junoguard/bin` shims; absolute paths still bypass |
 | Cursor shell install gate | **live (opt-in via init)** | `beforeShellExecution` deny for ungated npm/pnpm/yarn/pip installs; `failClosed: true` |
+| Claude Code shell install gate | **live (opt-in via init)** | `PreToolUse` Bash deny for ungated installs via the same `juno hook shell` classifier |
 | Guarded JS installs default to `--ignore-scripts` | **live** | `juno npm|pnpm …` adds `--ignore-scripts` unless overridden |
 | Tool-definition integrity on our own MCP surface | **live** | Names, descriptions and schemas hashed into a shipped `tools.lock.json`; the server verifies itself before serving and refuses to start on a mismatch (`juno mcp --verify`, exit `78`). CI checks both the TypeScript and Python servers |
-| Kernel / package-manager hook an agent cannot bypass | **planned** | Non-Cursor agents and absolute host escapes remain outside the shell hook |
+| Kernel / package-manager hook an agent cannot bypass | **planned** | Absolute host escapes and agents without a shell hook remain outside this boundary |
 
 `GET /health` reports `mode: mock` whenever the Ossprey or provider credentials
 are absent, so the running system says which of these it is.

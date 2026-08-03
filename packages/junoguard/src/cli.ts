@@ -29,6 +29,7 @@ import { DEFAULT_API_URL, JunoClient, JunoNotConfigured, JunoUnavailable } from 
 import { SCRIPT, clockNow, diffStatus, renderEvent, type Event } from "./feed.js";
 import {
   hookShellResponse,
+  writeClaudeHooks,
   writeCursorHooks,
 } from "./hooks.js";
 import {
@@ -606,6 +607,33 @@ function cmdInit(argv: string[], packageName: string): number {
           break;
       }
     }
+
+    if (agent.id === "claude-code") {
+      const hooks = writeClaudeHooks(scope, cwd, hookCommand, { force, dryRun });
+      switch (hooks.kind) {
+        case "written":
+          say(
+            `  ✓ ${"Claude hooks".padEnd(13)}${hooks.path}${hooks.created ? "  (created)" : ""}`,
+            "allow",
+          );
+          break;
+        case "exists":
+          say(`  · ${"Claude hooks".padEnd(13)}already configured — use --force to replace`, "dim");
+          break;
+        case "unparseable":
+          failures += 1;
+          say(`  ✗ ${"Claude hooks".padEnd(13)}${hooks.path} is not valid JSON`, "block");
+          if (hooks.snippet) {
+            console.log(
+              hooks.snippet
+                .split("\n")
+                .map((line) => `    ${pc.dim(line)}`)
+                .join("\n"),
+            );
+          }
+          break;
+      }
+    }
   }
 
   console.log();
@@ -685,7 +713,7 @@ ${pc.bold("COMMANDS")}
   yarn add <pkg>...         scan, then run the real yarn if all are clean
   pip install <pkg>...      scan, then run the real pip if all are clean
   wrap on|off|status        project PATH shims so bare installs hit the gate
-  hook shell                Cursor beforeShellExecution gate (stdin JSON)
+  hook shell                Cursor / Claude Code install gate (stdin JSON)
   watch                     tail the live decision feed
   init [agent]...           wire junoguard into an AI coding agent
   mcp                       run the MCP server over stdio
@@ -773,7 +801,7 @@ export async function main(
     case "hook": {
       const [sub] = rest;
       if (sub !== "shell") {
-        say("usage: juno hook shell   (reads Cursor hook stdin JSON)", "flag");
+        say("usage: juno hook shell   (reads Cursor or Claude Code hook stdin JSON)", "flag");
         return 1;
       }
       const raw = readFileSync(0, "utf8");

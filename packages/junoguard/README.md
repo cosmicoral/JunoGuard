@@ -186,6 +186,7 @@ juno yarn add react zod        # scan, then run the real yarn
 juno pip install requests      # scan, then run the real pip
 juno wrap on                   # PATH shims so bare installs hit the gate
 juno init cursor               # MCP config + Cursor shell install hook
+juno init claude-code          # MCP config + Claude Code PreToolUse Bash hook
 juno watch                     # tail the live decision feed
 ```
 
@@ -218,8 +219,8 @@ loud rather than implying they were approved.
 
 | Code | Meaning |
 |---|---|
-| `0` | allowed (or flagged — flags do not stop the install) |
-| `2` | blocked by policy |
+| `0` | allowed |
+| `2` | blocked or flagged by policy (flagged installs need `--allow-flagged`) |
 | `3` | the guard could not be consulted |
 | `4` | no project key configured |
 
