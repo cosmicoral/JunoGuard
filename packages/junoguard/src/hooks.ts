@@ -28,13 +28,13 @@ const INSTALL_VERBS = new Set(["install", "i", "add", "ci"]);
 /** True when the shell already routes through the juno CLI / package entrypoint. */
 export function isAlreadyJunoGated(command: string): boolean {
   const normalized = command.replace(/\uFEFF/g, "").trim();
-  if (/\bjuno\b/.test(normalized) && /\b(npm|pnpm|yarn|pip)\b/.test(normalized)) {
+  if (/\bjuno\b/.test(normalized) && /\b(npm|pnpm|yarn|pip|poetry|uv)\b/.test(normalized)) {
     return true;
   }
-  if (/@heysalad\/junoguard\b/.test(normalized) && /\b(npm|pnpm|yarn|pip)\b/.test(normalized)) {
+  if (/@heysalad\/junoguard\b/.test(normalized) && /\b(npm|pnpm|yarn|pip|poetry|uv)\b/.test(normalized)) {
     return true;
   }
-  if (/junoguard(?:\.js|\.mjs)?\b/.test(normalized) && /\b(npm|pnpm|yarn|pip)\b/.test(normalized)) {
+  if (/junoguard(?:\.js|\.mjs)?\b/.test(normalized) && /\b(npm|pnpm|yarn|pip|poetry|uv)\b/.test(normalized)) {
     return true;
   }
   return false;
@@ -93,6 +93,18 @@ function tokensLookLikeInstall(tokens: string[]): boolean {
       const verb = tokens[index + 3]?.toLowerCase();
       if ((module === "pip" || module === "pip3") && verb === "install") return true;
     }
+
+    if (base === "poetry") {
+      const verb = tokens[index + 1]?.toLowerCase();
+      if (verb && INSTALL_VERBS.has(verb)) return true;
+    }
+
+    if (base === "uv") {
+      const second = tokens[index + 1]?.toLowerCase();
+      const third = tokens[index + 2]?.toLowerCase();
+      if (second === "pip" && third === "install") return true;
+      if (second === "add" || second === "sync") return true;
+    }
   }
   return false;
 }
@@ -105,7 +117,7 @@ export function decideBeforeShell(command: string): ShellDecision {
   const agent_message = [
     "Package install blocked by JunoGuard.",
     "Use the MCP tool guard_install, or run through the CLI:",
-    "  juno npm|pnpm|yarn|pip install <package>...",
+    "  juno npm|pnpm|yarn|pip|poetry|uv install <package>...",
     "Bare package-manager installs are refused so a postinstall cannot run before a verdict.",
   ].join("\n");
 
@@ -228,7 +240,7 @@ export function buildCursorHookEntry(command: string): Record<string, unknown> {
   return {
     command,
     failClosed: true,
-    matcher: String.raw`\b(npm|pnpm|yarn|pip3?|python3?)\b`,
+    matcher: String.raw`\b(npm|pnpm|yarn|pip3?|python3?|poetry|uv)\b`,
   };
 }
 

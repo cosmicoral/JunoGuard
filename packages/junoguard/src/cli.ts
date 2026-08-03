@@ -721,6 +721,8 @@ ${pc.bold("COMMANDS")}
   pnpm install <pkg>...     scan, then run the real pnpm if all are clean
   yarn add <pkg>...         scan, then run the real yarn if all are clean
   pip install <pkg>...      scan, then run the real pip if all are clean
+  poetry add <pkg>...       scan, then run the real poetry if all are clean
+  uv pip install <pkg>...     scan, then run the real uv if all are clean
   wrap on|off|status        project PATH shims so bare installs hit the gate
   hook shell                Cursor / Claude Code install gate (stdin JSON)
   watch                     tail the live decision feed
@@ -728,7 +730,7 @@ ${pc.bold("COMMANDS")}
   mcp                       run the MCP server over stdio
 
 ${pc.bold("WRAP")}
-  juno wrap on              write .junoguard/bin shims for npm, pnpm, yarn, pip
+  juno wrap on              write .junoguard/bin shims for npm, pnpm, yarn, pip, poetry, uv
   juno wrap off             remove those shims
   juno wrap status          show whether PATH includes the wrap directory
   Absolute paths to the real package manager still bypass the wrap.
@@ -836,7 +838,8 @@ export async function main(
     case "npm":
     case "pnpm":
     case "yarn":
-    case "pip": {
+    case "pip":
+    case "poetry": {
       const [sub, ...tokens] = rest;
       const forwarders: Record<
         string,
@@ -862,14 +865,34 @@ export async function main(
           verbs: ["install"],
           argv: () => ["pip", "install"],
         },
+        poetry: {
+          ecosystem: "pypi",
+          verbs: ["add", "install"],
+          argv: (verb) => ["poetry", verb],
+        },
       };
       const forwarder = forwarders[command]!;
       if (!sub || !forwarder.verbs.includes(sub)) {
-        const preferred = command === "yarn" ? "add" : "install";
+        const preferred = command === "yarn" || command === "poetry" ? "add" : "install";
         say(`usage: juno ${command} ${preferred} <package>...`, "flag");
         return 1;
       }
       return cmdForward(tokens, forwarder.ecosystem, forwarder.argv(sub), command);
+    }
+
+    case "uv": {
+      const [sub, subsub, ...tokens] = rest;
+      if (sub === "pip" && subsub === "install") {
+        return cmdForward(tokens, "pypi", ["uv", "pip", "install"], "uv");
+      }
+      if (sub === "add") {
+        return cmdForward(tokens, "pypi", ["uv", "add"], "uv");
+      }
+      if (sub === "sync") {
+        return cmdForward(tokens, "pypi", ["uv", "sync"], "uv");
+      }
+      say("usage: juno uv pip install|add|sync <package>...", "flag");
+      return 1;
     }
 
     default:

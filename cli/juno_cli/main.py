@@ -45,10 +45,19 @@ yarn_app = typer.Typer(no_args_is_help=True, add_completion=False, rich_markup_m
                        help="yarn, guarded.")
 pip_app = typer.Typer(no_args_is_help=True, add_completion=False, rich_markup_mode=None,
                       help="pip, guarded.")
+poetry_app = typer.Typer(no_args_is_help=True, add_completion=False, rich_markup_mode=None,
+                         help="poetry, guarded.")
+uv_app = typer.Typer(no_args_is_help=True, add_completion=False, rich_markup_mode=None,
+                     help="uv, guarded.")
+uv_pip_app = typer.Typer(no_args_is_help=True, add_completion=False, rich_markup_mode=None,
+                         help="uv pip, guarded.")
 app.add_typer(npm_app, name="npm")
 app.add_typer(pnpm_app, name="pnpm")
 app.add_typer(yarn_app, name="yarn")
 app.add_typer(pip_app, name="pip")
+app.add_typer(poetry_app, name="poetry")
+app.add_typer(uv_app, name="uv")
+uv_app.add_typer(uv_pip_app, name="pip")
 
 _FORWARD_FLAGS = {"allow_extra_args": True, "ignore_unknown_options": True}
 
@@ -406,6 +415,48 @@ def pip_install(ctx: typer.Context) -> None:
     them come back clean. Flags are passed through to pip untouched.
     """
     _forward(ctx, "pypi", ["pip", "install"], "pip")
+
+
+@poetry_app.command("add", context_settings=_FORWARD_FLAGS)
+def poetry_add(ctx: typer.Context) -> None:
+    """Usage: juno poetry add PACKAGE... [POETRY FLAGS]
+
+    Scans every named package against the PyPI ecosystem, then runs the real
+    poetry add only if all of them come back clean.
+    """
+    _forward(ctx, "pypi", ["poetry", "add"], "poetry")
+
+
+@poetry_app.command("install", context_settings=_FORWARD_FLAGS, hidden=True)
+def poetry_install(ctx: typer.Context) -> None:
+    """Lockfile or named-package poetry install, guarded."""
+    _forward(ctx, "pypi", ["poetry", "install"], "poetry")
+
+
+@uv_pip_app.command("install", context_settings=_FORWARD_FLAGS)
+def uv_pip_install(ctx: typer.Context) -> None:
+    """Usage: juno uv pip install PACKAGE... [UV FLAGS]
+
+    Scans every named package against the PyPI ecosystem, then runs the real
+    uv pip install only if all of them come back clean.
+    """
+    _forward(ctx, "pypi", ["uv", "pip", "install"], "uv")
+
+
+@uv_app.command("add", context_settings=_FORWARD_FLAGS)
+def uv_add(ctx: typer.Context) -> None:
+    """Usage: juno uv add PACKAGE... [UV FLAGS]
+
+    Scans every named package against the PyPI ecosystem, then runs the real
+    uv add only if all of them come back clean.
+    """
+    _forward(ctx, "pypi", ["uv", "add"], "uv")
+
+
+@uv_app.command("sync", context_settings=_FORWARD_FLAGS, hidden=True)
+def uv_sync(ctx: typer.Context) -> None:
+    """Lockfile-only uv sync, guarded."""
+    _forward(ctx, "pypi", ["uv", "sync"], "uv")
 
 
 @app.command()

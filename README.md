@@ -136,7 +136,7 @@ already proceeded. See
 Every package the agent tries to install is intercepted **before** it reaches disk.
 
 - Pre-install interception over MCP — **advisory**: it depends on the agent
-  calling the tool. `juno npm|pnpm|yarn|pip …` closes the gap for installs that
+  calling the tool. `juno npm|pnpm|yarn|pip|poetry|uv …` closes the gap for installs that
   go through the CLI. `juno wrap on` adds project-local PATH shims so bare
   package-manager invocations hit the same gate; absolute paths to the real
   binary still bypass. `juno init` also writes Cursor `beforeShellExecution`

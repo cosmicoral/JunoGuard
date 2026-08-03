@@ -60,12 +60,12 @@ test("wrap on writes executable shims and status reports them", () => {
   const cwd = workspace();
   const { dir, created } = enableWrap({ cwd });
   assert.equal(dir, wrapDir(cwd));
-  assert.equal(created.length, 4);
-  for (const manager of ["npm", "pnpm", "yarn", "pip"]) {
+  assert.equal(created.length, 6);
+  for (const manager of ["npm", "pnpm", "yarn", "pip", "poetry", "uv"]) {
     accessSync(shimPath(manager, cwd), constants.X_OK);
   }
   const status = wrapStatus(cwd);
-  assert.deepEqual(status.active, ["npm", "pnpm", "yarn", "pip"]);
+  assert.deepEqual(status.active, ["npm", "pnpm", "yarn", "pip", "poetry", "uv"]);
   assert.equal(status.missing.length, 0);
 });
 
@@ -89,7 +89,7 @@ test("wrap off removes shims", () => {
   const cwd = workspace();
   enableWrap({ cwd });
   const { removed } = disableWrap(cwd);
-  assert.equal(removed.length, 4);
+  assert.equal(removed.length, 6);
   assert.deepEqual(wrapStatus(cwd).active, []);
 });
 

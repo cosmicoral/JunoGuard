@@ -68,6 +68,60 @@ test("npm and pnpm installs get --ignore-scripts by default", () => {
   );
 });
 
+test("poetry forwarder refuses a mock-blocked package before spawning", async () => {
+  process.env.JUNO_MOCK = "1";
+  silence();
+  const code = await main(["poetry", "add", "@ossprey/test-package"], {
+    name: "@heysalad/junoguard",
+    version: "0.0.0-test",
+  });
+  assert.equal(code, 2);
+});
+
+test("uv pip install forwarder refuses a mock-blocked package before spawning", async () => {
+  process.env.JUNO_MOCK = "1";
+  silence();
+  const code = await main(["uv", "pip", "install", "@ossprey/test-package"], {
+    name: "@heysalad/junoguard",
+    version: "0.0.0-test",
+  });
+  assert.equal(code, 2);
+});
+
+test("poetry install is refused without an override", async () => {
+  process.env.JUNO_MOCK = "1";
+  silence();
+  const code = await main(["poetry", "install"], {
+    name: "@heysalad/junoguard",
+    version: "0.0.0-test",
+  });
+  assert.equal(code, 5);
+});
+
+test("uv sync is refused without an override", async () => {
+  process.env.JUNO_MOCK = "1";
+  silence();
+  const code = await main(["uv", "sync"], {
+    name: "@heysalad/junoguard",
+    version: "0.0.0-test",
+  });
+  assert.equal(code, 5);
+});
+
+test("help lists poetry and uv forwarders", async () => {
+  let printed = "";
+  console.log = (value) => {
+    printed += String(value);
+  };
+  const code = await main(["--help"], {
+    name: "@heysalad/junoguard",
+    version: "0.0.0-test",
+  });
+  assert.equal(code, 0);
+  assert.match(printed, /poetry add/);
+  assert.match(printed, /uv pip install/);
+});
+
 test("help lists pnpm and yarn forwarders", async () => {
   let printed = "";
   console.log = (value) => {

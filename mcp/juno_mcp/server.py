@@ -58,8 +58,8 @@ def guard_install(package: str, ecosystem: str = "npm", version: str | None = No
     """Check a package with JunoGuard BEFORE installing it. Required for every install.
 
     Call this first, every time, for any dependency you are about to add — npm,
-    pnpm, yarn, pip, or a manifest edit. Only run the real package manager if
-    this returns an allow.
+    pnpm, yarn, pip, poetry, uv, or a manifest edit. Only run the real package
+    manager if this returns an allow.
 
     Args:
         package: Package name, e.g. "express" or "@ossprey/test-package".

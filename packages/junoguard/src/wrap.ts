@@ -20,7 +20,7 @@ import {
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const WRAP_MANAGERS = ["npm", "pnpm", "yarn", "pip"] as const;
+export const WRAP_MANAGERS = ["npm", "pnpm", "yarn", "pip", "poetry", "uv"] as const;
 export type WrapManager = (typeof WRAP_MANAGERS)[number];
 
 export function wrapDir(cwd = process.cwd()): string {
