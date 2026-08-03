@@ -152,7 +152,9 @@ Every package the agent tries to install is intercepted **before** it reaches di
 - Sources that cannot be scanned — lockfile installs, local archives, Git and
   URL sources — are **refused**, not waved through. Proceeding takes a named
   operator override, and the override is recorded as an audited gap in coverage.
-- **Structured refusal** returned to the agent — a machine-readable reason, so it self-corrects to a safe alternative instead of retrying blindly
+- **Agent-readable refusal** — MCP tools return plain text with verdict, reason,
+  and blast radius so the model can self-correct instead of retrying blindly.
+  The gateway API still uses structured `allow` / `flag` / `block` JSON.
 - A scanner outage is refused, not downgraded to a warning: no verdict means no install
 
 ### Lane B — Tokens and cost
