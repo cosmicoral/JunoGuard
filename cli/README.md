@@ -57,6 +57,7 @@ the CLI says so out loud rather than implying they were approved.
 | `0` | allowed |
 | `2` | blocked or flagged by policy (flagged installs need `--allow-flagged`) |
 | `3` | the guard could not be consulted |
+| `4` | no project key configured |
 | `5` | source cannot be scanned (lockfile / local / git / URL) without an audited override |
 
 `2`, `3`, and `5` all stop the install — an unreachable or unscanned path is not

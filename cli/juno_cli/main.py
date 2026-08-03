@@ -16,7 +16,7 @@ import time
 import typer
 
 from . import __version__
-from .client import JunoClient, JunoUnavailable
+from .client import JunoClient, JunoNotConfigured, JunoUnavailable
 from .console import console, emit, to_rich
 from .feed import SCRIPT, Event, clock_now, diff_status, render_event
 from .render import S_BLOCK, S_DIM, S_FLAG, render_error, render_install, render_status
@@ -26,6 +26,7 @@ from .render import S_BLOCK, S_DIM, S_FLAG, render_error, render_install, render
 EXIT_OK = 0
 EXIT_BLOCKED = 2
 EXIT_UNAVAILABLE = 3
+EXIT_NOT_CONFIGURED = 4
 # Distinct from a policy block: nothing was evaluated, so there is no verdict —
 # only the absence of one, which is still a refusal.
 EXIT_UNSCANNABLE = 5
@@ -73,12 +74,32 @@ def _unreachable(subject: str, exc: JunoUnavailable, consequence: str) -> typer.
     return typer.Exit(EXIT_UNAVAILABLE)
 
 
+def _not_configured(subject: str) -> typer.Exit:
+    emit(
+        render_error(
+            subject,
+            "JUNO_PROJECT_KEY is not configured",
+            "Set JUNO_PROJECT_KEY to your project key, or re-run with JUNO_MOCK=1.",
+        ),
+        stderr=True,
+    )
+    return typer.Exit(EXIT_NOT_CONFIGURED)
+
+
+def _consult_failure(subject: str, exc: Exception, consequence: str) -> typer.Exit:
+    if isinstance(exc, JunoNotConfigured):
+        raise _not_configured(subject)
+    if isinstance(exc, JunoUnavailable):
+        raise _unreachable(subject, exc, consequence)
+    raise exc
+
+
 def _scan_one(client: JunoClient, package: str, ecosystem: str, version: str | None) -> str:
     """Scan and render one package. Returns the decision."""
     try:
         payload = client.guard_install(package, ecosystem, version)
-    except JunoUnavailable as exc:
-        raise _unreachable(
+    except (JunoNotConfigured, JunoUnavailable) as exc:
+        raise _consult_failure(
             f"{package}  ({ecosystem})",
             exc,
             "The guard could not be consulted, so nothing was installed.\n"
@@ -103,8 +124,8 @@ def status() -> None:
     client = JunoClient()
     try:
         payload = client.status()
-    except JunoUnavailable as exc:
-        raise _unreachable(
+    except (JunoNotConfigured, JunoUnavailable) as exc:
+        raise _consult_failure(
             "project status",
             exc,
             "No budget or incident data is available.\n"
@@ -229,7 +250,7 @@ def _record_override(
         payload = client.report_unscanned(
             sources, ecosystem, manager, str(reason), str(operator)
         )
-    except JunoUnavailable as exc:
+    except (JunoNotConfigured, JunoUnavailable) as exc:
         # An unrecordable override is exactly what an attacker would want, so
         # this fails closed rather than proceeding on trust.
         console.print(f"The override could not be recorded: {exc.detail}", style=S_BLOCK)
@@ -420,8 +441,8 @@ def _watch_live(client: JunoClient, interval: float) -> None:
     while True:
         try:
             current = client.status()
-        except JunoUnavailable as exc:
-            print_event(Event("block", "guard", f"gateway unreachable — {exc.detail}"))
+        except (JunoNotConfigured, JunoUnavailable) as exc:
+            print_event(Event("block", "guard", f"guard unavailable — {exc.detail}"))
             time.sleep(interval)
             continue
 

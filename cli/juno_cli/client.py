@@ -20,7 +20,6 @@ from pathlib import Path
 import httpx
 
 DEFAULT_API_URL = "http://localhost:8000"
-DEFAULT_PROJECT_KEY = "jg_demo_key_cursorhack2026"
 # Must outlive the gateway's own scan budget (OSSPREY_SCAN_BUDGET_SECONDS, 90s).
 # Giving up first turns a verdict that was coming into a fail-closed refusal.
 DEFAULT_TIMEOUT = 100.0
@@ -98,6 +97,14 @@ class JunoUnavailable(Exception):
         self.status = status
 
 
+class JunoNotConfigured(Exception):
+    """Live use requires JUNO_PROJECT_KEY."""
+
+    def __init__(self, detail: str = "JUNO_PROJECT_KEY is not configured"):
+        super().__init__(detail)
+        self.detail = detail
+
+
 def mock_enabled() -> bool:
     return os.getenv("JUNO_MOCK", "").strip().lower() in _TRUTHY
 
@@ -111,13 +118,15 @@ class JunoClient:
         timeout: float | None = None,
     ):
         self.api_url = (api_url or os.getenv("JUNO_API_URL") or DEFAULT_API_URL).rstrip("/")
-        self.project_key = project_key or os.getenv("JUNO_PROJECT_KEY") or DEFAULT_PROJECT_KEY
+        self.project_key = project_key or os.getenv("JUNO_PROJECT_KEY") or None
         self.mock = mock_enabled() if mock is None else mock
         self.timeout = timeout or float(os.getenv("JUNO_TIMEOUT", DEFAULT_TIMEOUT))
 
     # -- transport ---------------------------------------------------------
 
     def _request(self, method: str, path: str, json: dict | None = None) -> dict:
+        if not self.mock and not self.project_key:
+            raise JunoNotConfigured()
         url = f"{self.api_url}{path}"
         headers = {"X-Juno-Key": self.project_key}
         try:

@@ -27,7 +27,7 @@ except ImportError:  # mcp SDK 1.x
     from mcp.server.fastmcp import FastMCP as _Server
 
 from . import integrity
-from .client import JunoClient, JunoUnavailable
+from .client import JunoClient, JunoNotConfigured, JunoUnavailable
 from .render import render_error, render_install, render_llm, render_status, to_plain
 
 mcp = _Server("junoguard")
@@ -43,6 +43,14 @@ def _client() -> JunoClient:
 
 def _unavailable(subject: str, exc: JunoUnavailable, consequence: str) -> str:
     return to_plain(render_error(subject, exc.detail, consequence))
+
+
+def _consult_failure(subject: str, exc: Exception, consequence: str) -> str:
+    if isinstance(exc, JunoNotConfigured):
+        return _unavailable(subject, JunoUnavailable(exc.detail), consequence)
+    if isinstance(exc, JunoUnavailable):
+        return _unavailable(subject, exc, consequence)
+    raise exc
 
 
 @mcp.tool()
@@ -64,8 +72,8 @@ def guard_install(package: str, ecosystem: str = "npm", version: str | None = No
     """
     try:
         payload = _client().guard_install(package, ecosystem, version)
-    except JunoUnavailable as exc:
-        return _unavailable(
+    except (JunoNotConfigured, JunoUnavailable) as exc:
+        return _consult_failure(
             f"{package}  ({ecosystem})",
             exc,
             "The guard could not be consulted, so this install is not approved.\n"
@@ -93,8 +101,8 @@ def guard_llm(prompt: str, model: str | None = None, max_output_tokens: int = 30
     label = model or "gateway default"
     try:
         payload = _client().guard_llm(prompt, model, max_output_tokens)
-    except JunoUnavailable as exc:
-        return _unavailable(
+    except (JunoNotConfigured, JunoUnavailable) as exc:
+        return _consult_failure(
             f"model call  ·  {label}",
             exc,
             "The guard could not be consulted, so this call was not made.\n"
@@ -113,8 +121,8 @@ def guard_status() -> str:
     """
     try:
         payload = _client().status()
-    except JunoUnavailable as exc:
-        return _unavailable(
+    except (JunoNotConfigured, JunoUnavailable) as exc:
+        return _consult_failure(
             "project status",
             exc,
             "The guard could not be consulted. Assume no budget is available\n"
