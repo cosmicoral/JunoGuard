@@ -223,7 +223,7 @@ export function Landing() {
             <div>
               <p className="card-label">SUPPLY CHAIN</p>
               <h3>Stop the package before it reaches disk.</h3>
-              <p>Installs that go through the MCP tool, `juno` CLI/PATH wrap, or Cursor shell hook are scanned for known risk and refused with a structured reason the agent can understand.</p>
+              <p>Installs that go through the MCP tool, `juno` CLI/PATH wrap, or Cursor / Claude Code shell hooks are scanned for known risk and refused with a structured reason the agent can understand.</p>
             </div>
             <ul>
               <li><span>01</span> Pre-install interception</li>
@@ -265,7 +265,7 @@ export function Landing() {
           <div><b>~0 ms</b><span>LLM latency added</span></div>
           <div><b>1 gate</b><span>across both lanes</span></div>
           <div><b>100%</b><span>deterministic hot path</span></div>
-          <p>No AI on the hot path, so a decision costs no tokens and adds no latency. Deep out-of-band analysis of flagged packages is on the roadmap, not in the product.</p>
+          <p>No AI on the hot path, so a decision costs no tokens and adds no latency. Non-clean packages can still take a cold-path Modal detonation step for evidence after the response — that does not sit on the hot path.</p>
         </div>
       </section>
 
