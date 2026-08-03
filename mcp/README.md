@@ -127,6 +127,10 @@ python -m juno_mcp --verify        # exit 0 if the surface matches the lock
 python -m juno_mcp --update-lock   # re-pin after a reviewed change
 ```
 
+CI verifies the lock with **Python 3.12** and the hashed deps in
+`mcp/requirements.txt`. Re-pin with that same environment or the verify job
+will fail even when your local Python version differs.
+
 A refusal exits `78` and names the tool that changed. Cursor shows the server
 red — that is the alert. CI runs `--verify` on every push, so drift between the
 code and the lock fails the build.
