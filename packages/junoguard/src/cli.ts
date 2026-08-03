@@ -47,6 +47,7 @@ import {
   resolveRealBinary,
   wrapStatus,
 } from "./wrap.js";
+import { wrapArgvForHostSandbox } from "./host-sandbox.js";
 
 // 0 clean · 2 blocked by policy · 3 guard unreachable. Distinct so CI can tell
 // "Juno said no" from "Juno was down", which are different problems.
@@ -370,9 +371,17 @@ function exec(cmd: string[], manager: string): Promise<number> {
   const gated = withIgnoredScripts(cmd, manager);
   const real = resolveRealBinary(gated[0] ?? manager);
   const argv = [real, ...gated.slice(1)];
-  say(`$ ${argv.join(" ")}`, "dim");
+  const sandboxed = wrapArgvForHostSandbox(argv);
+  if ("error" in sandboxed) {
+    say(sandboxed.error, "block");
+    return Promise.resolve(EXIT_UNAVAILABLE);
+  }
+  say(`$ ${sandboxed.argv.join(" ")}`, "dim");
   return new Promise((resolve) => {
-    const child = spawn(argv[0]!, argv.slice(1), { stdio: "inherit", shell: false });
+    const child = spawn(sandboxed.argv[0]!, sandboxed.argv.slice(1), {
+      stdio: "inherit",
+      shell: false,
+    });
     child.on("error", () => {
       say(`${manager} is not on PATH`, "block");
       resolve(EXIT_UNAVAILABLE);
@@ -754,6 +763,12 @@ ${pc.bold("ENVIRONMENT")}
   JUNO_API_URL              gateway base URL (default ${DEFAULT_API_URL})
   JUNO_MOCK=1               offline fixtures, no network, no key needed
   JUNO_TIMEOUT              seconds before a gateway call gives up
+  JUNO_HOST_SANDBOX=1       run approved installs inside an OS sandbox (opt-in)
+
+${pc.bold("HOST SANDBOX")}
+  JUNO_HOST_SANDBOX=1       credential-scoped sandbox on approved exec() only
+  macOS uses sandbox-exec; Linux uses bwrap when present. Fails closed if the
+  helper is missing. Absolute-path installs and ungated agents still bypass.
 
 ${pc.bold("TRY IT WITHOUT A GATEWAY")}
   JUNO_MOCK=1 juno scan @ossprey/test-package

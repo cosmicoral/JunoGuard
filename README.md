@@ -141,8 +141,9 @@ Every package the agent tries to install is intercepted **before** it reaches di
   package-manager invocations hit the same gate; absolute paths to the real
   binary still bypass. `juno init` also writes Cursor `beforeShellExecution`
   and Claude Code `PreToolUse` Bash hooks that deny ungated installs inside
-  those agent shells. A kernel boundary that every agent genuinely cannot step
-  around is not implemented.
+  those agent shells. `JUNO_HOST_SANDBOX=1` adds an opt-in OS sandbox around
+  approved `juno …` exec() calls (macOS `sandbox-exec`, Linux `bwrap`). A
+  kernel boundary that every agent genuinely cannot step around is not implemented.
 - [Ossprey](https://ossprey.com) malware verdict
 - Registry-backed CycloneDX 1.6 SBOM for the exact package coordinate
 - Optional Docker detonation of non-clean npm lifecycle scripts and PyPI
@@ -240,7 +241,7 @@ what is still an intention.
 | Claude Code shell install gate | **live (opt-in via init)** | `PreToolUse` Bash deny for ungated installs via the same `juno hook shell` classifier |
 | Guarded JS installs default to `--ignore-scripts` | **live** | `juno npm|pnpm …` adds `--ignore-scripts` unless overridden |
 | Tool-definition integrity on our own MCP surface | **live** | Names, descriptions and schemas hashed into a shipped `tools.lock.json`; the server verifies itself before serving and refuses to start on a mismatch (`juno mcp --verify`, exit `78`). CI checks both the TypeScript and Python servers |
-| Kernel / package-manager hook an agent cannot bypass | **planned** | Absolute host escapes and agents without a shell hook remain outside this boundary |
+| Host OS sandbox on approved installs | **live (opt-in)** | `JUNO_HOST_SANDBOX=1` wraps post-verdict `exec()` in a credential-scoped sandbox; absolute paths and ungated agents still bypass |
 
 `GET /health` reports `mode: mock` whenever the Ossprey or provider credentials
 are absent, so the running system says which of these it is.
