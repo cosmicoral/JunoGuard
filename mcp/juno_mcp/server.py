@@ -76,7 +76,7 @@ def guard_install(package: str, ecosystem: str = "npm", version: str | None = No
 
 
 @mcp.tool()
-def guard_llm(prompt: str, model: str = "gpt-4o", max_output_tokens: int = 300) -> str:
+def guard_llm(prompt: str, model: str | None = None, max_output_tokens: int = 300) -> str:
     """Make a model call through JunoGuard, with budget and burst policy applied.
 
     The provider key stays server-side and never reaches this client. Token
@@ -84,22 +84,23 @@ def guard_llm(prompt: str, model: str = "gpt-4o", max_output_tokens: int = 300) 
 
     Args:
         prompt: The prompt to send.
-        model: Model id. Defaults to "gpt-4o".
+        model: Model id. Omit to use the gateway deployment default.
         max_output_tokens: Output cap for this call. Defaults to 300.
 
     If the result is a block, no model call was made and nothing was charged.
     Do not retry the same call — reduce it, or stop and ask the operator.
     """
+    label = model or "gateway default"
     try:
         payload = _client().guard_llm(prompt, model, max_output_tokens)
     except JunoUnavailable as exc:
         return _unavailable(
-            f"model call  ·  {model}",
+            f"model call  ·  {label}",
             exc,
             "The guard could not be consulted, so this call was not made.\n"
             "Start the JunoGuard gateway, or set JUNO_MOCK=1 for offline mode.",
         )
-    return to_plain(render_llm(payload, model))
+    return to_plain(render_llm(payload, label))
 
 
 @mcp.tool()

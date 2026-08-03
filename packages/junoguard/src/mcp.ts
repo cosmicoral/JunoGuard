@@ -110,18 +110,21 @@ export function createServer(version: string): McpServer {
       ].join("\n"),
       inputSchema: {
         prompt: z.string().describe("The prompt to send."),
-        model: z.string().default("gpt-4o").describe("Model id."),
+        model: z
+          .string()
+          .optional()
+          .describe("Model id. Omit to use the gateway deployment default."),
         max_output_tokens: z.number().int().positive().default(300).describe("Output cap."),
       },
     },
     async ({ prompt, model, max_output_tokens }) => {
-      const chosen = model ?? "gpt-4o";
+      const label = model ?? "gateway default";
       try {
-        const payload = await new JunoClient().guardLlm(prompt, chosen, max_output_tokens ?? 300);
-        return asText(toPlain(renderLlm(payload, chosen)));
+        const payload = await new JunoClient().guardLlm(prompt, model, max_output_tokens ?? 300);
+        return asText(toPlain(renderLlm(payload, label)));
       } catch (error) {
         return unavailable(
-          `model call  ·  ${chosen}`,
+          `model call  ·  ${label}`,
           error,
           "The guard could not be consulted, so this call was not made.\n" +
             "Start the JunoGuard gateway, or set JUNO_MOCK=1 for offline mode.",

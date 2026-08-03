@@ -157,14 +157,13 @@ class JunoClient:
             },
         )
 
-    def guard_llm(self, prompt: str, model: str = "gpt-4o", max_output_tokens: int = 300) -> dict:
+    def guard_llm(self, prompt: str, model: str | None = None, max_output_tokens: int = 300) -> dict:
         if self.mock:
-            return mock_llm(prompt, model, max_output_tokens)
-        return self._request(
-            "POST",
-            "/v1/guard/llm",
-            {"prompt": prompt, "model": model, "max_output_tokens": max_output_tokens},
-        )
+            return mock_llm(prompt, model or "gateway-default", max_output_tokens)
+        body: dict[str, object] = {"prompt": prompt, "max_output_tokens": max_output_tokens}
+        if model:
+            body["model"] = model
+        return self._request("POST", "/v1/guard/llm", body)
 
     def report_unscanned(
         self,

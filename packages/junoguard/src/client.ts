@@ -125,13 +125,14 @@ export class JunoClient {
     });
   }
 
-  guardLlm(prompt: string, model = "gpt-4o", maxOutputTokens = 300): Promise<LlmResult> {
+  guardLlm(prompt: string, model?: string, maxOutputTokens = 300): Promise<LlmResult> {
     if (this.mock) return Promise.resolve(mockLlm(prompt, maxOutputTokens));
-    return this.request<LlmResult>("POST", "/v1/guard/llm", {
+    const body: { prompt: string; max_output_tokens: number; model?: string } = {
       prompt,
-      model,
       max_output_tokens: maxOutputTokens,
-    });
+    };
+    if (model) body.model = model;
+    return this.request<LlmResult>("POST", "/v1/guard/llm", body);
   }
 
   /**
