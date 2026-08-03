@@ -17,11 +17,23 @@
  * Nothing here may write to stdout — that channel carries JSON-RPC framing.
  */
 
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
 import { JunoClient, JunoNotConfigured, JunoUnavailable } from "./client.js";
+import {
+  allowUnpinnedFromEnv,
+  gate,
+  loadLock,
+  REFUSE_EXIT_CODE,
+  verify,
+  writeLock,
+  type Report,
+  type ToolLike,
+} from "./integrity.js";
 import {
   renderError,
   renderInstall,
@@ -148,7 +160,64 @@ export function createServer(version: string): McpServer {
   return server;
 }
 
+/**
+ * The tool surface exactly as a client receives it.
+ *
+ * Read back through a real client over an in-memory transport rather than from
+ * the registration objects, so what we hash is the wire shape — including the
+ * JSON Schema the SDK derives from zod, which is part of what the model sees.
+ */
+export async function toolDefinitions(version: string): Promise<ToolLike[]> {
+  const server = createServer(version);
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "junoguard-integrity", version });
+  try {
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    const { tools } = await client.listTools();
+    return tools as ToolLike[];
+  } finally {
+    await client.close().catch(() => {});
+    await server.close().catch(() => {});
+  }
+}
+
+export async function checkIntegrity(version: string): Promise<Report> {
+  return verify(await toolDefinitions(version), loadLock());
+}
+
+/** `juno mcp --verify` — the drift check CI runs on every push. */
+export async function cmdVerify(version: string): Promise<number> {
+  const report = await checkIntegrity(version);
+  const { summarise } = await import("./integrity.js");
+  console.log(`junoguard: ${summarise(report)}`);
+  return report.ok ? 0 : 1;
+}
+
+/** `juno mcp --update-lock` — re-pin after a reviewed change. */
+export async function cmdUpdateLock(version: string): Promise<number> {
+  const manifest = writeLock(await toolDefinitions(version));
+  const names = Object.keys(manifest.tools);
+  console.log(
+    `junoguard: pinned ${names.length} tools (${names.join(", ")}) -> tools.lock.json\n` +
+      `  surface ${manifest.surface}\n` +
+      `  Commit this file: it is the reviewed record of what agents are told.`,
+  );
+  return 0;
+}
+
+/**
+ * Verify our own tool definitions, then serve.
+ *
+ * A guard that cannot vouch for what it is telling the agent has nothing to
+ * offer it, so this fails closed like everything else here: refuse to start and
+ * name the tool that moved, rather than serving a surface nobody reviewed.
+ * stderr, never stdout — that channel carries JSON-RPC framing.
+ */
 export async function runStdioServer(version: string): Promise<void> {
+  const decision = gate(await checkIntegrity(version), allowUnpinnedFromEnv());
+  if (decision.message) console.error(decision.message);
+  if (!decision.serve) process.exit(REFUSE_EXIT_CODE);
+
   const server = createServer(version);
   await server.connect(new StdioServerTransport());
 }

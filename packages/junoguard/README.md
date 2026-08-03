@@ -138,6 +138,36 @@ Prefer to wire it yourself:
 `guard_status` matters: the agent can check its own budget before a run of
 expensive work, rather than discovering the limit by hitting it.
 
+### Tool-definition integrity
+
+A tool description is not documentation — your model reads it as instruction.
+Which makes an MCP server a target twice over:
+
+- **Tool poisoning** — instructions hidden in a description no human reads.
+- **Rug pull** — a server you approved while benign later redefines its tools
+  and keeps your approval. Most clients never tell you.
+
+We are an MCP server, so we hold ourselves to it. Every tool's name,
+description and JSON Schema is hashed into `tools.lock.json`, which ships in
+this package. The server verifies itself against that lock **before it serves
+anything** and refuses to start if the surface has moved:
+
+```bash
+npx -y @heysalad/junoguard mcp --verify
+```
+
+Exit `0` means the tools your agent is about to be given are byte-for-byte the
+ones in our repository. A mismatch exits `78`, names the tool that changed, and
+the server does not start — your client shows it red, which is the alert. Our
+CI runs the same check on every push, so the code and the lock cannot drift.
+
+You can run that command against your installed copy any time. It is the
+question "is this still the server I approved?", and it has an answer.
+
+**What it does not do:** an attacker who changes the source *and* the lock in
+one reviewed commit is not stopped by a hash. The lock is what makes that
+visible in a diff. Signed definitions are the next step.
+
 ---
 
 ## The CLI
@@ -205,7 +235,8 @@ set Juno up" are three different problems. All of them stop the install.
 | `JUNO_PROJECT_KEY` | **none — required for live use** | Sent as `X-Juno-Key` |
 | `JUNO_API_URL` | `http://localhost:8000` | Gateway base URL |
 | `JUNO_MOCK` | unset | `1` for offline fixtures — no network, no key needed |
-| `JUNO_TIMEOUT` | `20` | Seconds before a gateway call gives up |
+| `JUNO_TIMEOUT` | `100` | Seconds before a gateway call gives up |
+| `JUNO_MCP_ALLOW_UNPINNED` | unset | `1` serves an unverified tool surface (development only) |
 
 There is deliberately no default project key. Without one, every surface
 returns a `JUNO · NOT CONFIGURED` refusal and the CLI exits `4` — it does not

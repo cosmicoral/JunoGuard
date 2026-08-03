@@ -78,11 +78,49 @@ explicitly — stops rather than retrying.
 
 - **Red dot, no tools.** The `command` path is wrong or the venv is missing.
   Run the absolute path from a terminal; it must start without a traceback.
+  If it prints `refusing to start`, the tool surface no longer matches
+  `tools.lock.json` — see [Tool-definition integrity](#tool-definition-integrity).
 - **Tools listed but every call returns `JUNO · UNAVAILABLE`.** That is
   correct behaviour with no gateway running. Start the backend, or set
   `"JUNO_MOCK": "1"` in `.cursor/mcp.json` and refresh.
 - Cursor caches the server process. After editing `mcp.json`, always hit
   refresh in MCP settings.
+
+---
+
+## Tool-definition integrity
+
+A tool description is not documentation — the model reads it as instruction. So
+the two MCP-specific attacks in [docs/threat-landscape.md](../docs/threat-landscape.md) §2.4
+apply to us as much as to anyone:
+
+- **Tool poisoning** — instructions hidden in a description no human reads.
+- **Rug pull** — a server approved while benign later redefines its tools and
+  keeps the approval. Most clients never alert on the change.
+
+Every tool's name, description and schema is hashed into
+[`juno_mcp/tools.lock.json`](juno_mcp/tools.lock.json), which is committed. The
+server verifies itself against that lock **before it serves anything**, and
+refuses to start if the surface has moved:
+
+```bash
+python -m juno_mcp --verify        # exit 0 if the surface matches the lock
+python -m juno_mcp --update-lock   # re-pin after a reviewed change
+```
+
+A refusal exits `78` and names the tool that changed. Cursor shows the server
+red — that is the alert. CI runs `--verify` on every push, so drift between the
+code and the lock fails the build.
+
+Changing a tool description is therefore a two-part commit: the change, and the
+re-pinned lock. The diff is the review.
+
+`JUNO_MCP_ALLOW_UNPINNED=1` serves an unverified surface with a warning. It is
+for developing new tools, not for getting past a failure you have not read.
+
+**What this does not do:** an attacker who edits the source *and* the lock in
+one reviewed commit is not stopped by a hash. The lock is what makes that
+visible in a diff. Signed definitions (ETDI) are the next increment.
 
 ---
 
@@ -93,7 +131,8 @@ explicitly — stops rather than retrying.
 | `JUNO_API_URL` | `http://localhost:8000` | Gateway base URL |
 | `JUNO_PROJECT_KEY` | `jg_demo_key_cursorhack2026` | Sent as `X-Juno-Key` |
 | `JUNO_MOCK` | unset (live) | `1` for offline fixtures, no network at all |
-| `JUNO_TIMEOUT` | `20` | Seconds before a gateway call gives up |
+| `JUNO_TIMEOUT` | `100` | Seconds before a gateway call gives up |
+| `JUNO_MCP_ALLOW_UNPINNED` | unset | `1` serves an unverified tool surface (development only) |
 
 ---
 

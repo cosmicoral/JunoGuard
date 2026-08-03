@@ -27,6 +27,30 @@ jobs:
         run: pip install --require-hashes -r requirements.txt
       - name: Security-invariant suite
         run: pytest -q
+      - name: MCP tool-integrity unit tests
+        run: pytest -q ../mcp/tests
+
+  mcp-integrity:
+    name: MCP tool definitions match the lock
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: mcp/requirements.txt
+      - name: Install hashed dependencies
+        run: pip install --require-hashes -r requirements.txt
+      - name: Install the server
+        run: pip install --no-deps -e .
+      # Fails if the tool surface an agent would receive has drifted from the
+      # reviewed tools.lock.json — the rug-pull check, run against the real SDK.
+      - name: Verify tool surface against tools.lock.json
+        run: python -m juno_mcp --verify
 
   migrations:
     name: Supabase migrations re-runnable
@@ -58,6 +82,10 @@ jobs:
         run: npm audit --audit-level=high
       - run: npm run build
       - run: npm test
+      # Fails if the tool surface an agent would receive has drifted from the
+      # reviewed tools.lock.json — the rug-pull check on the published package.
+      - name: Verify tool surface against tools.lock.json
+        run: node dist/bin.js mcp --verify
 
   sandbox:
     name: Sandbox images and boundary canaries

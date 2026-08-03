@@ -231,6 +231,7 @@ Honest map. Compare against README's capability table and keep both true.
 | Unreviewable agent behaviour | Every decision is an audit record with an accountable actor |
 | Blast radius of a bad install | Names-only credential scope, enriched with scanner and sandbox evidence |
 | Post-hoc evidence | Modal detonation in a network-blocked sandbox; report lands on the action and its incident, and can retroactively block |
+| Tool poisoning / rug pull of our own MCP surface (§2.4) | Tool names, descriptions and schemas are hashed into a committed `tools.lock.json`; the server verifies itself before serving and refuses to start on a mismatch. CI verifies against the real SDK, so code and lock cannot drift |
 
 The structural bet worth stating plainly: **we are a deterministic policy gate
 outside the model.** That is the same architectural claim as tier 3 above, applied
@@ -244,20 +245,24 @@ to the one action an agent takes that runs arbitrary code on your machine.
   shell hook. Already flagged as `planned` in README.
 - **The IDE CVE class (§2.3).** `.claude/settings.json` RCE is the IDE's trust
   boundary, not ours.
-- **MCP tool poisoning / rug pull (§2.4).** We *are* an MCP surface. We do not
-  currently verify our own tool-definition integrity. **This is the most credible
-  gap in the product.**
+- **Someone else's MCP servers.** We pin our own tool definitions (below); we do
+  not police the other servers an agent has loaded. Cross-server shadowing
+  (§2.4) is still open.
 - **Identity and help desk (§1.1, §1.2).** Out of scope, and should stay out.
 
 **Roadmap candidates, in the order the threat model justifies**
 
-1. Tool-definition integrity for our MCP surface — signed definitions, alert on
-   change. Directly answers §2.4, and we sell agent security.
+1. ~~Tool-definition integrity for our MCP surface~~ — **done.** Hash-pinned in
+   `mcp/juno_mcp/tools.lock.json`, verified at startup and in CI, fails closed.
+   Signed definitions (ETDI proper) are the next increment: a hash makes a
+   change reviewable, a signature makes it unforgeable off-repo.
 2. Egress policy for guarded installs — take the third trifecta leg, not just the
    package verdict.
 3. `npm audit signatures` / provenance checking as a verdict input — free signal,
    already in the npm CLI.
 4. Detonation on the hot path for the flagged-and-proceeded case.
+5. Verify *other* servers' tool definitions, not just ours — the same lock
+   applied outward is a product feature, not just hygiene.
 
 ---
 
@@ -273,6 +278,7 @@ event, not an incident.
 - [x] Production refuses to look ready on degraded infrastructure (`/ready`)
 - [x] Scanner outage fails closed
 - [x] Detonation callbacks bearer-authenticated, size-capped, schema-reduced
+- [x] Our own MCP tool definitions hash-pinned, verified at startup and in CI
 - [ ] **Passkeys on GitHub, npm, Vercel, Supabase, Modal, OpenAI** — do this tonight
 - [ ] **npm publish with provenance + 2FA on the npm org** — we ship a package; we
       are a supply-chain target ourselves

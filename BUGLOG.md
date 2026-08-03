@@ -621,6 +621,66 @@ verification condition. Status values are `OPEN`, `IN PROGRESS`, `FIXED`, or
   The default budget is 90s so a popular package is not intermittently
   unscannable.
 
+### JG-021 — We are an MCP surface that never verified its own tool definitions
+
+**Priority:** P1 / High
+**Status:** FIXED
+
+> **Review comment:** Named in `docs/threat-landscape.md` §2.4 as the most
+> credible gap in the product, and left open when the threat model was written.
+> A tool description is not documentation — the model reads it as instruction,
+> so whoever controls it steers the agent. Two consequences follow. **Tool
+> poisoning** puts instructions in a description no human reads. **Rug pull**
+> lets a server approved while benign redefine its tools later and keep the
+> approval, because no mainstream client alerts on the change.
+>
+> Both applied to us. `@heysalad/junoguard` is installed via `npx -y`, which
+> re-resolves the package on every run, so a compromised publish would reach
+> users with no install step to notice. We sell agent security while shipping
+> the one surface we could not vouch for.
+
+**Reproduction**
+
+- Edit any `description` in `packages/junoguard/src/mcp.ts`, rebuild, restart
+  the MCP server.
+- Before the fix: the agent silently receives the new instruction. Nothing in
+  the client, the server, or CI reports a change.
+
+**Mitigation**
+
+- Hash each tool's name, title, description, input schema, output schema and
+  annotations into a committed `tools.lock.json`, plus one digest over the tool
+  set so an added or removed tool is also a change.
+- Verify at startup and refuse to serve on a mismatch — exit `78`, naming the
+  tool that moved. The client renders the server red, which is the alert. A
+  missing or unreadable lock is a refusal too: "cannot check" is not "probably
+  fine", the same rule as a scanner outage under JG-004.
+- Hash the wire shape, read back through a real client over an in-memory
+  transport, not the registration objects — the JSON Schema the SDK derives
+  from zod is part of what the model sees.
+- Exclude SDK-set presentation fields (`icons`, `_meta`, `execution`) and the
+  package version from the digest. A lock that fails on every release trains
+  people to re-pin without reading it.
+- Both surfaces: TypeScript (`packages/junoguard`, the published one) and
+  Python (`mcp/`).
+- `JUNO_MCP_ALLOW_UNPINNED=1` serves unverified, for developing new tools. An
+  environment variable rather than a config setting, so it leaves a trace.
+
+**Verification**
+
+- `juno mcp --verify` and `python -m juno_mcp --verify` both exit `0` against
+  the committed locks; CI runs both on every push, so code and lock cannot
+  drift.
+- 19 TypeScript tests (37 total in the package) and 22 Python tests cover a
+  poisoned description, schema tampering, added and removed tools, a missing
+  lock, a hand-edited surface digest, and the refusal message itself.
+- `tools.lock.json` is in the package `files` list — a lock that does not ship
+  cannot be checked by anyone who installed us.
+
+**Known limit, stated in both READMEs:** an attacker who edits the source and
+the lock in one reviewed commit is not stopped by a hash. The lock makes that
+visible in a diff. Signed definitions (ETDI) are the next increment.
+
 ## Test and audit log
 
 ### Passed

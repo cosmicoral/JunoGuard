@@ -235,6 +235,7 @@ what is still an intention.
 | PATH wrap for bare package-manager installs | **live (opt-in)** | `juno wrap on` → `.junoguard/bin` shims; absolute paths still bypass |
 | Cursor shell install gate | **live (opt-in via init)** | `beforeShellExecution` deny for ungated npm/pnpm/yarn/pip installs; `failClosed: true` |
 | Guarded JS installs default to `--ignore-scripts` | **live** | `juno npm|pnpm …` adds `--ignore-scripts` unless overridden |
+| Tool-definition integrity on our own MCP surface | **live** | Names, descriptions and schemas hashed into a shipped `tools.lock.json`; the server verifies itself before serving and refuses to start on a mismatch (`juno mcp --verify`, exit `78`). CI checks both the TypeScript and Python servers |
 | Kernel / package-manager hook an agent cannot bypass | **planned** | Non-Cursor agents and absolute host escapes remain outside the shell hook |
 
 `GET /health` reports `mode: mock` whenever the Ossprey or provider credentials
@@ -253,6 +254,13 @@ What the agent sees:
 | `guard_status()` | Spend today, budget remaining, project status |
 
 `guard_status` matters: the agent can check its own budget before acting, rather than discovering the limit by hitting it.
+
+These three definitions are hash-pinned in `tools.lock.json`. The server checks
+itself against that lock before it serves anything and refuses to start if the
+surface has moved — a tool description is an instruction to the model, so a
+silent change to one is a silent change to agent behaviour. Run
+`juno mcp --verify` against your installed copy to ask whether it is still the
+server you approved. See [docs/threat-landscape.md](docs/threat-landscape.md) §2.4.
 
 Shipped as [`@heysalad/junoguard`](https://www.npmjs.com/package/@heysalad/junoguard) —
 one npm package containing both the MCP server and the `juno` CLI:

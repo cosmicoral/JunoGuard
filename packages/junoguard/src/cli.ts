@@ -746,8 +746,10 @@ export async function main(
 
     case "mcp": {
       // Imported lazily so the CLI path never pays for the MCP SDK.
-      const { runStdioServer } = await import("./mcp.js");
-      await runStdioServer(version);
+      const mcp = await import("./mcp.js");
+      if (rest.includes("--verify")) return mcp.cmdVerify(version);
+      if (rest.includes("--update-lock")) return mcp.cmdUpdateLock(version);
+      await mcp.runStdioServer(version);
       return new Promise<number>(() => {}); // stdio server owns the process
     }
 

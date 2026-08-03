@@ -1,4 +1,6 @@
-from .server import main
+import sys
+
+from .server import cli
 
 if __name__ == "__main__":
-    main()
+    sys.exit(cli())

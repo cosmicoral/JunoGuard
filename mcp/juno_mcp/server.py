@@ -16,13 +16,17 @@ Design notes that matter:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
+import sys
 
 try:  # mcp SDK >= 2.0
     from mcp.server.mcpserver import MCPServer as _Server
 except ImportError:  # mcp SDK 1.x
     from mcp.server.fastmcp import FastMCP as _Server
 
+from . import integrity
 from .client import JunoClient, JunoUnavailable
 from .render import render_error, render_install, render_llm, render_status, to_plain
 
@@ -118,9 +122,58 @@ def guard_status() -> str:
     return to_plain(render_status(payload))
 
 
+def tool_definitions() -> list:
+    """The tool surface exactly as a client would receive it."""
+    return asyncio.run(mcp.list_tools())
+
+
+def check_integrity() -> integrity.Report:
+    return integrity.verify(tool_definitions(), integrity.load_lock())
+
+
+def _allow_unpinned() -> bool:
+    return os.getenv(integrity.UNPINNED_ENV, "").strip().lower() in {"1", "true", "yes"}
+
+
 def main() -> None:
+    """Verify our own tool definitions, then serve.
+
+    A guard that cannot vouch for what it is telling the agent has nothing to
+    offer it, so this fails closed like everything else here: the server refuses
+    to start and names the tool that moved, rather than serving a surface nobody
+    reviewed. Cursor shows it red, which is the alert.
+    """
+    decision = integrity.gate(check_integrity(), _allow_unpinned())
+    if decision.message:
+        print(decision.message, file=sys.stderr)
+    if not decision.serve:
+        raise SystemExit(integrity.REFUSE_EXIT_CODE)
+
     mcp.run()
 
 
-if __name__ == "__main__":
+def cli(argv: list[str] | None = None) -> int:
+    """`--verify` for CI, `--update-lock` to re-pin after a reviewed change."""
+    args = list(sys.argv[1:] if argv is None else argv)
+
+    if "--verify" in args:
+        report = check_integrity()
+        print(f"juno-mcp: {report.summary()}")
+        return 0 if report.ok else 1
+
+    if "--update-lock" in args:
+        manifest = integrity.write_lock(tool_definitions())
+        print(
+            f"juno-mcp: pinned {len(manifest['tools'])} tools "
+            f"({', '.join(manifest['tools'])}) -> {integrity.LOCK_PATH.name}\n"
+            f"  surface {manifest['surface']}\n"
+            f"  Commit this file: it is the reviewed record of what agents are told."
+        )
+        return 0
+
     main()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(cli())

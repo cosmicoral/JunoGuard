@@ -1,0 +1,10 @@
+{
+  "lock_version": 1,
+  "algorithm": "sha256",
+  "tools": {
+    "guard_install": "e3a6d1a0d99123017f14681b453f56de08df102f04a9dc1bb0b34bde714f7f0a",
+    "guard_llm": "32edc32f167e047a4c0d3c93d2a6f0fa22b72975d6cbc6e8f44b511e46d6dbf1",
+    "guard_status": "c86a70f214990becaed22ef92437c2ea41776ec7243cb59b09678548cacb01cf"
+  },
+  "surface": "2f5dc1cd86354c16fa76698635415410f092c46dd91c9fc0ef557edb6e21872a"
+}

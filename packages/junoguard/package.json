@@ -33,6 +33,7 @@
   },
   "files": [
     "dist",
+    "tools.lock.json",
     "README.md"
   ],
   "scripts": {
